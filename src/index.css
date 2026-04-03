@@ -1,0 +1,177 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply text-slate-900 dark:text-slate-100 antialiased;
+    font-family: 'Inter', 'Noto Sans Devanagari', system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-user-select: none;
+    user-select: none;
+    background-image: linear-gradient(rgba(248, 250, 252, 0.95), rgba(248, 250, 252, 0.9)), url('/bg-shops.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+}
+
+.dark body {
+  background-image: linear-gradient(rgba(2, 6, 23, 0.96), rgba(2, 6, 23, 0.94)), url('/bg-shops.png');
+}
+
+/* Sensitive Content Protection */
+.secure-content {
+  position: relative;
+  overflow: hidden;
+}
+
+.secure-content::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3F%3F%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  animation: noise-shift 0.2s infinite steps(2);
+}
+
+@keyframes noise-shift {
+  0% { transform: translate(0, 0); }
+  10% { transform: translate(-1%, -1%); }
+  20% { transform: translate(-2%, 1%); }
+  30% { transform: translate(1%, -2%); }
+  40% { transform: translate(-1%, 3%); }
+  50% { transform: translate(-2%, 2%); }
+  60% { transform: translate(3%, 0); }
+  70% { transform: translate(0, 2%); }
+  80% { transform: translate(-3%, 1%); }
+  90% { transform: translate(1%, 2%); }
+  100% { transform: translate(1%, 1%); }
+}
+
+.no-context {
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-slate-100 dark:bg-slate-800;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 dark:bg-slate-600 rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-400 dark:bg-slate-500;
+}
+
+/* Glassmorphism utility */
+.glass-panel {
+  @apply bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-xl;
+}
+
+/* Kirana theme gradients */
+.bg-kirana-gradient {
+  background: linear-gradient(135deg, #15803d 0%, #16a34a 50%, #22c55e 100%);
+}
+
+.bg-kirana-orange-gradient {
+  background: linear-gradient(135deg, #f97316 0%, #fb923c 50%, #fdba74 100%);
+}
+
+/* Focus ring */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-kirana-green focus:ring-offset-2 dark:focus:ring-offset-slate-900;
+}
+
+/* Button press effect */
+.btn-press {
+  @apply active:scale-[0.98] transition-transform duration-100;
+}
+
+/* Input animations */
+input, select {
+  @apply transition-all duration-200;
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    @apply bg-white text-black;
+  }
+}
+
+/* Safe area for PWA on notched phones */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.safe-area-pt {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Page transition */
+.page-enter {
+  animation: fadeSlideIn 0.25s ease-out;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Pulse dot for new order badge */
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.5); }
+}
+.pulse-dot {
+  animation: pulseDot 1.5s ease-in-out infinite;
+}
+
+/* Shimmer animation for Skeletons */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2.5s infinite linear;
+}
+
+.dark .shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}

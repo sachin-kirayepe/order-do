@@ -1,0 +1,207 @@
+import { useState, useMemo } from 'react';
+import { AnimatePresence } from 'framer-motion';
+import { PackageOpen, User, MapPin, ImageIcon, Banknote, QrCode, AlertCircle } from 'lucide-react';
+import type { OrderItem } from '../../db/dexie';
+import Button from '../ui/Button';
+import { useLanguage } from '../../context/LanguageContext';
+import { useAntiCapture } from '../../hooks/useAntiCapture';
+import ProtectionOverlay from '../ui/ProtectionOverlay';
+import SecureCanvas from '../ui/SecureCanvas';
+import UPIQRCode from './UPIQRCode';
+
+interface OrderPreviewProps {
+  photo: string;
+  customerName: string;
+  customerAddress: string;
+  items: OrderItem[];
+  shopId: string;
+  shopName: string;
+  upiId?: string;
+  onSubmit: (paymentStatus: 'cod' | 'upi') => void;
+  submitting: boolean;
+  submitted: boolean;
+}
+
+export default function OrderPreview({
+  photo, customerName, customerAddress, items, shopName, upiId, onSubmit, submitting, submitted,
+}: OrderPreviewProps) {
+  const { t } = useLanguage();
+  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'upi'>('cod');
+  const { isBlocked } = useAntiCapture(!submitted);
+
+  const { totalAmount, hasUnpricedItems } = useMemo(() => {
+    let sum = 0;
+    let missing = false;
+    items.forEach(item => {
+      if (item.price) sum += item.price;
+      else missing = true;
+    });
+    return { totalAmount: sum, hasUnpricedItems: missing };
+  }, [items]);
+
+  const canSubmit = !!photo && !!customerName && !!customerAddress && items.length > 0;
+
+
+  return (
+    <div className="flex flex-col gap-5 relative">
+      <ProtectionOverlay isVisible={isBlocked} />
+      
+      <h2 className="text-xl font-bold text-slate-800 dark:text-white text-center lowercase tracking-tighter italic">
+        {t('customer.orderReview')}
+      </h2>
+
+      {/* Photo */}
+      <div className="rounded-3xl overflow-hidden border-2 border-slate-200 dark:border-slate-800 relative shadow-sm">
+        {photo ? (
+          <SecureCanvas 
+            image={photo} 
+            width={640} 
+            height={360} 
+            tagline="Order Proof // Secure"
+            className="border-none"
+          />
+        ) : (
+          <div className="w-full h-32 bg-slate-50 dark:bg-slate-800/50 flex flex-col items-center justify-center gap-2 text-slate-400">
+            <ImageIcon size={28} />
+            <span className="text-sm">{t('customer.photoMissing')}</span>
+          </div>
+        )}
+        {!photo && (
+          <div className="absolute inset-0 bg-red-500/5 border-2 border-dashed border-red-300 rounded-3xl flex items-center justify-center">
+            <span className="text-red-500 text-xs font-bold uppercase tracking-widest">{t('customer.photoRequired')}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Info Cards */}
+      <div className="grid grid-cols-1 gap-3">
+        <div className="flex items-center gap-3 bg-white dark:bg-slate-800/50 rounded-2xl px-4 py-3 border border-slate-100 dark:border-slate-800">
+          <div className="p-2 bg-kirana-green/10 rounded-xl text-kirana-green">
+            <User size={18} />
+          </div>
+          {customerName ? (
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('customer.steps.name')}</p>
+              <SecureCanvas content={customerName} width={300} height={32} fontSize={15} className="border-none bg-transparent" />
+            </div>
+          ) : (
+            <p className="text-sm text-red-500 font-bold">⚠️ {t('customer.nameRequired')}</p>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3 bg-white dark:bg-slate-800/50 rounded-2xl px-4 py-3 border border-slate-100 dark:border-slate-800">
+          <div className="p-2 bg-kirana-orange/10 rounded-xl text-kirana-orange">
+            <MapPin size={18} />
+          </div>
+          {customerAddress ? (
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('setup.address')}</p>
+              <SecureCanvas content={customerAddress} width={300} height={32} fontSize={14} className="border-none bg-transparent" />
+            </div>
+          ) : (
+            <p className="text-sm text-red-500 font-bold">⚠️ Address required</p>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800/50 overflow-hidden">
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 px-4 py-2">
+            <PackageOpen size={14} className="text-kirana-orange" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-0.5">{t('customer.steps.items')} ({items.length})</span>
+          </div>
+          <div className="p-2">
+            {items.length > 0 ? (
+              <SecureCanvas 
+                content={items.map(it => `${it.name} - ${it.quantity}`)} 
+                width={380} 
+                height={Math.max(80, items.length * 28)} 
+                fontSize={14}
+                className="border-none bg-transparent"
+              />
+            ) : (
+              <div className="px-4 py-4 text-sm text-red-500 font-bold text-center italic">{t('customer.itemsRequired')}</div>
+            )}
+          </div>
+          
+          {/* Total Row */}
+          {totalAmount > 0 && (
+            <div className="px-4 py-3 bg-kirana-green/5 dark:bg-kirana-green/10 flex justify-between items-center border-t border-kirana-green/20">
+              <span className="text-sm font-black text-slate-500 uppercase tracking-widest">{t('customer.totalAmount')}</span>
+              <span className="text-xl font-black text-kirana-green">₹{totalAmount}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {hasUnpricedItems && (
+        <div className="flex gap-2 p-3 bg-amber-50 dark:bg-amber-500/5 rounded-2xl border border-amber-200 dark:border-amber-500/20">
+          <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+          <p className="text-[10px] font-bold text-amber-700 dark:text-amber-500 leading-tight">
+            {t('customer.finalPriceNote')}
+          </p>
+        </div>
+      )}
+
+      {/* Payment Selection */}
+      <div className="space-y-3">
+        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Payment Method</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => setPaymentMethod('cod')}
+            className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-300 ${
+              paymentMethod === 'cod' 
+                ? 'border-kirana-green bg-kirana-green/10 shadow-lg shadow-kirana-green/5' 
+                : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800/50 text-slate-400 opacity-60'
+            }`}
+          >
+            <div className={`p-2 rounded-xl ${paymentMethod === 'cod' ? 'bg-kirana-green text-white' : 'bg-slate-100 dark:bg-slate-700'}`}>
+              <Banknote size={24} />
+            </div>
+            <span className="text-xs font-black uppercase tracking-tighter italic">{t('customer.payCash')}</span>
+          </button>
+
+          {upiId ? (
+            <button
+              onClick={() => setPaymentMethod('upi')}
+              className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-300 ${
+                paymentMethod === 'upi' 
+                  ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/5' 
+                  : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800/50 text-slate-400 opacity-60'
+              }`}
+            >
+              <div className={`p-2 rounded-xl ${paymentMethod === 'upi' ? 'bg-blue-500 text-white' : 'bg-slate-100 dark:bg-slate-700'}`}>
+                <QrCode size={24} />
+              </div>
+              <span className="text-xs font-black uppercase tracking-tighter italic">{t('customer.payUPI')}</span>
+            </button>
+          ) : (
+            <div className="flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 opacity-30">
+               <QrCode size={24} className="text-slate-300 mb-1" />
+               <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">UPI Unavailable</span>
+            </div>
+          )}
+        </div>
+
+        <AnimatePresence>
+          {paymentMethod === 'upi' && upiId && totalAmount > 0 && (
+            <UPIQRCode upiId={upiId} shopName={shopName} amount={totalAmount} />
+          )}
+        </AnimatePresence>
+      </div>
+
+      <Button
+        onClick={() => onSubmit(paymentMethod)}
+        disabled={!canSubmit}
+        isLoading={submitting}
+        className="w-full py-4 text-lg font-black italic tracking-tighter uppercase"
+      >
+        {t('customer.submitOrder')} ✓
+      </Button>
+
+      {!canSubmit && (
+        <p className="text-[10px] text-center font-bold text-slate-400 uppercase tracking-widest px-8">
+          {t('customer.previewFooter')}
+        </p>
+      )}
+    </div>
+  );
+}
