@@ -97,8 +97,8 @@ export default function TalkingCharacter() {
                     <Canvas 
                       shadows 
                       dpr={[1, 2]} 
-                      onCreated={({ gl }: { gl: any }) => {
-                        gl.setClearColor('#000000', 0);
+                      onCreated={({ gl }) => {
+                        (gl as any).setClearColor('#000000', 0);
                       }}
                       onError={() => setHasCanvasError(true)}
                     >
