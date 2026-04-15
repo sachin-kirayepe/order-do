@@ -15,7 +15,7 @@ export default function UPIQRCode({ upiId, shopName, amount }: UPIQRCodeProps) {
   useEffect(() => {
     if (canvasRef.current && upiId) {
       // Standard UPI Payment URI: upi://pay?pa=<address>&pn=<name>&am=<amount>&cu=INR
-      const upiUri = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(shopName)}&am=${amount}&cu=INR`;
+      const upiUri = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(shopName)}&am=${amount}&cu=INR`;
       
       QRCode.toCanvas(canvasRef.current, upiUri, {
         width: 200,

@@ -26,7 +26,7 @@ function parseVoiceItems(transcript: string): OrderItem[] {
 }
 
 export default function VoiceItemList({ items, onItemsChange }: VoiceItemListProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState('');
@@ -150,9 +150,22 @@ export default function VoiceItemList({ items, onItemsChange }: VoiceItemListPro
       )}
 
       {items.length === 0 && (
-        <div className="flex flex-col items-center gap-2 py-6 text-slate-400">
-          <PackageOpen size={36} />
-          <p className="text-sm text-center">{t('customer.noItems')}</p>
+        <div className="flex flex-col items-center gap-4 py-6">
+          <div className="flex flex-col items-center gap-2 text-slate-400">
+            <PackageOpen size={36} />
+            <p className="text-sm text-center">{t('customer.noItems')}</p>
+          </div>
+          
+          <div className="w-full p-4 bg-brand-secondary/5 rounded-2xl border border-dashed border-brand-secondary/20">
+             <p className="text-[10px] font-black text-brand-secondary uppercase tracking-widest mb-1">
+               {language === 'hi' ? 'बोलने का तरीका (Tip)' : 'How to speak (Tip)'}
+             </p>
+             <p className="text-[10px] text-slate-500 font-bold leading-relaxed italic">
+               {language === 'hi' 
+                 ? '"2 किलो आटा, 1 पैकेट नमक, आधा लीटर तेल" - ऐसे बोलें।' 
+                 : '"2 kg Atta, 1 packet Namak, half liter Oil" - Say it like this.'}
+             </p>
+          </div>
         </div>
       )}
 

@@ -435,7 +435,7 @@ export const translations = {
       noOrders: 'No pending orders',
       instruction: 'Special Info',
     }
-  }
+  },
 };
 
 export type Language = 'hi' | 'en';

@@ -23,16 +23,15 @@ export function analyzeEnvironment(ctx: CanvasRenderingContext2D, width: number,
   const patchSize = 50;
   let variance = 0;
   let count = 0;
-  let prevLuma = -1;
-
   for (let y = centerY - patchSize; y < centerY + patchSize; y += 2) {
+    let rowPrevLuma = -1; // Reset for each row to avoid jumps
     for (let x = centerX - patchSize; x < centerX + patchSize; x += 2) {
       const idx = (y * width + x) * 4;
       const luma = (0.299 * data[idx] + 0.587 * data[idx+1] + 0.114 * data[idx+2]);
-      if (prevLuma !== -1) {
-        variance += Math.abs(luma - prevLuma);
+      if (rowPrevLuma !== -1) {
+        variance += Math.abs(luma - rowPrevLuma);
       }
-      prevLuma = luma;
+      rowPrevLuma = luma;
       count++;
     }
   }
@@ -41,7 +40,7 @@ export function analyzeEnvironment(ctx: CanvasRenderingContext2D, width: number,
   return {
     brightness: avgLuma, // 0-255
     contrast: contrastScore, // ~0-100 (higher is sharper)
-    isTooDark: avgLuma < 40,
+    isTooDark: avgLuma < 15,
     isTooBright: avgLuma > 220,
     isBlurry: contrastScore < 5
   };

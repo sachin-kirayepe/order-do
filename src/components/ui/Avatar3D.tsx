@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useState, useEffect, Suspense } from 'react';
+import { useRef, useMemo, useState, useEffect, Suspense } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
@@ -181,6 +181,7 @@ export default function Avatar3D() {
                 await fetch('https://models.readyplayer.me/ready.png', { mode: 'no-cors', signal: controller.signal });
                 clearTimeout(timeoutId);
                 setHasInternet(true);
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             } catch (e) {
                 setHasInternet(false);
                 setLoadError(true);

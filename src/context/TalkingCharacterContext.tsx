@@ -44,12 +44,10 @@ export function TalkingCharacterProvider({ children }: { children: React.ReactNo
     
     const findClearVoice = (langCode: string, preferences: string[]) => {
         const langVoices = voices.filter(v => v.lang.includes(langCode));
-        // Priority to specific high-quality providers
         for (const pref of preferences) {
             const found = langVoices.find(v => v.name.includes(pref));
             if (found) return found;
         }
-        // Fallback to any female voice in that language
         return langVoices.find(v => v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('google') || v.name.toLowerCase().includes('microsoft'));
     };
 
@@ -62,9 +60,8 @@ export function TalkingCharacterProvider({ children }: { children: React.ReactNo
       utterance.voice = enVoice;
     }
 
-    // "Crystal Clear" Audio Tuning
-    utterance.pitch = 1.1; // Clearer female tone
-    utterance.rate = 0.95;  // Slightly more professional and articulate speed
+    utterance.pitch = 1.1; 
+    utterance.rate = 0.95;  
     utterance.volume = 1.0;
 
     utterance.onstart = () => {
@@ -76,7 +73,6 @@ export function TalkingCharacterProvider({ children }: { children: React.ReactNo
     utterance.onend = () => {
       setIsSpeaking(false);
       setAction('idle');
-      // Hide text bubble after a short delay
       setTimeout(() => {
         if (!window.speechSynthesis.speaking) {
           setCurrentText('');

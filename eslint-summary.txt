@@ -1,0 +1,324 @@
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\CameraCapture.tsx
+  Line 127:47 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 128:26 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 128:35 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 167:50 - Error: Cannot access variable before it is declared
+
+`processVideoFrame` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\CameraCapture.tsx:167:50
+  165 |     const landmarker = landmarkerRef.current;
+  166 |     if (!video || !landmarker || video.readyState !== 4) {
+> 167 |       requestRef.current = requestAnimationFrame(processVideoFrame);
+      |                                                  ^^^^^^^^^^^^^^^^^ `processVideoFrame` accessed before it is declared
+  168 |       return;
+  169 |     }
+  170 |
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\CameraCapture.tsx:163:3
+  161 |   }, [lastEar, language, speak, vibrate, baselineEar]);
+  162 |
+> 163 |   const processVideoFrame = useCallback(async () => {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 164 |     const video = videoRef.current;
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 165 |     const landmarker = landmarkerRef.current;
+      ΓÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 239 |     requestRef.current = requestAnimationFrame(processVideoFrame);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 240 |   }, [livenessStep, detectBlink, language]);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `processVideoFrame` is declared here
+  241 |
+  242 |   const startCamera = useCallback(async () => {
+  243 |     setLoading(true); (react-hooks/immutability)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\VoiceAddressInput.tsx
+  Line 12:14 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 12:51 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 20:33 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 37:28 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\VoiceItemList.tsx
+  Line 12:14 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 12:51 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 35:33 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 65:28 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\VoiceNameInput.tsx
+  Line 15:14 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 15:51 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 24:33 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 64:28 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\components\shopkeeper\DailySalesReport.tsx
+  Line 147:15 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 162:51 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 164:15 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 165:25 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\components\shopkeeper\MultiQRGenerator.tsx
+  Line 109:33 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\components\shopkeeper\VoiceSettings.tsx
+  Line 61:37 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\Confetti.tsx
+  Line 13:11 - Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\Confetti.tsx:13:11
+  11 |   const particles = useMemo(() => Array.from({ length: 40 }).map((_, i) => ({
+  12 |     id: i,
+> 13 |     size: Math.random() * 8 + 4,
+     |           ^^^^^^^^^^^^^ Cannot call impure function
+  14 |     color: colors[Math.floor(Math.random() * colors.length)],
+  15 |     xDelta: (Math.random() - 0.5) * 400,
+  16 |     duration: Math.random() * 2 + 1.5, (react-hooks/purity)
+  Line 14:30 - Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\Confetti.tsx:14:30
+  12 |     id: i,
+  13 |     size: Math.random() * 8 + 4,
+> 14 |     color: colors[Math.floor(Math.random() * colors.length)],
+     |                              ^^^^^^^^^^^^^ Cannot call impure function
+  15 |     xDelta: (Math.random() - 0.5) * 400,
+  16 |     duration: Math.random() * 2 + 1.5,
+  17 |     delay: Math.random() * 0.2, (react-hooks/purity)
+  Line 15:14 - Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\Confetti.tsx:15:14
+  13 |     size: Math.random() * 8 + 4,
+  14 |     color: colors[Math.floor(Math.random() * colors.length)],
+> 15 |     xDelta: (Math.random() - 0.5) * 400,
+     |              ^^^^^^^^^^^^^ Cannot call impure function
+  16 |     duration: Math.random() * 2 + 1.5,
+  17 |     delay: Math.random() * 0.2,
+  18 |     isRound: Math.random() > 0.5 (react-hooks/purity)
+  Line 16:15 - Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\Confetti.tsx:16:15
+  14 |     color: colors[Math.floor(Math.random() * colors.length)],
+  15 |     xDelta: (Math.random() - 0.5) * 400,
+> 16 |     duration: Math.random() * 2 + 1.5,
+     |               ^^^^^^^^^^^^^ Cannot call impure function
+  17 |     delay: Math.random() * 0.2,
+  18 |     isRound: Math.random() > 0.5
+  19 |   })), []); (react-hooks/purity)
+  Line 17:12 - Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\Confetti.tsx:17:12
+  15 |     xDelta: (Math.random() - 0.5) * 400,
+  16 |     duration: Math.random() * 2 + 1.5,
+> 17 |     delay: Math.random() * 0.2,
+     |            ^^^^^^^^^^^^^ Cannot call impure function
+  18 |     isRound: Math.random() > 0.5
+  19 |   })), []);
+  20 | (react-hooks/purity)
+  Line 18:14 - Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\Confetti.tsx:18:14
+  16 |     duration: Math.random() * 2 + 1.5,
+  17 |     delay: Math.random() * 0.2,
+> 18 |     isRound: Math.random() > 0.5
+     |              ^^^^^^^^^^^^^ Cannot call impure function
+  19 |   })), []);
+  20 |
+  21 |   useEffect(() => { (react-hooks/purity)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\ErrorBoundary.tsx
+  Line 18:42 - '_' is defined but never used. (@typescript-eslint/no-unused-vars)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\InstallPrompt.tsx
+  Line 8:56 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\OfflineBanner.tsx
+  Line 15:7 - Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\OfflineBanner.tsx:15:7
+  13 |     // Localhost is usually considered secure by browsers, so we check for production
+  14 |     if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+> 15 |       setInsecure(true);
+     |       ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  16 |     }
+  17 |
+  18 |     const goOffline = () => setOffline(true); (react-hooks/set-state-in-effect)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\ProtectionOverlay.tsx
+  Line 10:9 - Unexpected empty object pattern. (no-empty-pattern)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\SecureCanvas.tsx
+  Line 55:28 - Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `className`, but the source dependencies were [content, image, width, height, fontSize, textAlign, applySecurityLayers]. Inferred different dependency than source.
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\SecureCanvas.tsx:55:28
+   53 |   }, [width, height, tagline]);
+   54 |
+>  55 |   const draw = useCallback(() => {
+      |                            ^^^^^^^
+>  56 |     const canvas = canvasRef.current;
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  57 |     if (!canvas) return;
+      ΓÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 100 |     }
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 101 |   }, [content, image, width, height, fontSize, textAlign, applySecurityLayers]);
+      | ^^^^ Could not preserve existing manual memoization
+  102 |
+  103 |   useEffect(() => {
+  104 |     draw(); (react-hooks/preserve-manual-memoization)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\TalkingCharacter.tsx
+  Line 38:21 - Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\TalkingCharacter.tsx:38:21
+  36 |   // Auto-show logic
+  37 |   useEffect(() => {
+> 38 |     if (isSpeaking) setMinimized(false);
+     |                     ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  39 |   }, [isSpeaking]);
+  40 |
+  41 |   if (!isVisible && !isSpeaking) return null; (react-hooks/set-state-in-effect)
+  Line 126:54 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\context\AuthContext.tsx
+  Line 66:14 - Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components. (react-refresh/only-export-components)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\context\LanguageContext.tsx
+  Line 25:18 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 48:14 - Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components. (react-refresh/only-export-components)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\context\SubscriptionContext.tsx
+  Line 78:36 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 125:14 - Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components. (react-refresh/only-export-components)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\context\TalkingCharacterContext.tsx
+  Line 130:17 - Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components. (react-refresh/only-export-components)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\context\ThemeContext.tsx
+  Line 64:14 - Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components. (react-refresh/only-export-components)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\context\VoiceContext.tsx
+  Line 4:14 - Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components. (react-refresh/only-export-components)
+  Line 18:14 - Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components. (react-refresh/only-export-components)
+  Line 25:14 - Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components. (react-refresh/only-export-components)
+  Line 159:5 - Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\context\VoiceContext.tsx:159:5
+  157 |
+  158 |   useEffect(() => {
+> 159 |     loadVoices();
+      |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  160 |     if (synth.onvoiceschanged !== undefined) {
+  161 |       synth.onvoiceschanged = loadVoices;
+  162 |     } (react-hooks/set-state-in-effect)
+  Line 267:59 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 275:63 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 276:24 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 354:17 - Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components. (react-refresh/only-export-components)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\hooks\useSound.ts
+  Line 10:63 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 43:63 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\pages\Landing.tsx
+  Line 18:56 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 138:19 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 387:45 - Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\pages\Landing.tsx:387:45
+  385 |                 <button
+  386 |                   type="submit"
+> 387 |                   disabled={adminLoading || Date.now() < lockoutUntil}
+      |                                             ^^^^^^^^^^ Cannot call impure function
+  388 |                   className={`w-full py-3.5 rounded-xl font-black text-sm tracking-wide transition-all ${
+  389 |                     adminLoading || Date.now() < lockoutUntil
+  390 |                       ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed' (react-hooks/purity)
+  Line 389:37 - Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\pages\Landing.tsx:389:37
+  387 |                   disabled={adminLoading || Date.now() < lockoutUntil}
+  388 |                   className={`w-full py-3.5 rounded-xl font-black text-sm tracking-wide transition-all ${
+> 389 |                     adminLoading || Date.now() < lockoutUntil
+      |                                     ^^^^^^^^^^ Cannot call impure function
+  390 |                       ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+  391 |                       : 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 hover:to-red-800 active:scale-[0.98] shadow-xl shadow-red-600/20'
+  392 |                   }`} (react-hooks/purity)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\pages\admin\Payments.tsx
+  Line 40:5 - Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\pages\admin\Payments.tsx:40:5
+  38 |
+  39 |   useEffect(() => {
+> 40 |     fetchPayments();
+     |     ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  41 |   }, []);
+  42 |
+  43 |   const handleAction = async (paymentId: string, action: 'confirmed' | 'rejected', shopId: string, planId: number) => { (react-hooks/set-state-in-effect)
+  Line 63:14 - 'err' is defined but never used. (@typescript-eslint/no-unused-vars)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\pages\admin\Plans.tsx
+  Line 67:19 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 81:26 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 123:19 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 153:9 - Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do nothing if the following line is error-free. (@typescript-eslint/ban-ts-comment)
+  Line 231:23 - Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do nothing if the following line is error-free. (@typescript-eslint/ban-ts-comment)
+  Line 238:22 - Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do nothing if the following line is error-free. (@typescript-eslint/ban-ts-comment)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\pages\admin\Shops.tsx
+  Line 6:3 - 'ChevronRight' is defined but never used. (@typescript-eslint/no-unused-vars)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\pages\order\OrderFlow.tsx
+  Line 26:14 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 26:51 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 30:22 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 58:50 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 62:52 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 103:28 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\pages\shop\Dashboard.tsx
+  Line 40:14 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 40:51 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 71:34 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 245:14 - 'err' is defined but never used. (@typescript-eslint/no-unused-vars)
+  Line 615:42 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 686:51 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 825:97 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 826:117 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 828:97 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 829:117 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\pages\shop\KDSView.tsx
+  Line 32:50 - Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\pages\shop\KDSView.tsx:32:50
+  30 |   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  31 |   const { isBlocked } = useAntiCapture(true);
+> 32 |   const [currentTime, setCurrentTime] = useState(Date.now());
+     |                                                  ^^^^^^^^^^ Cannot call impure function
+  33 |   
+  34 |   const lastCountRef = useRef(0);
+  35 |   const audioContextRef = useRef<AudioContext | null>(null); (react-hooks/purity)
+  Line 57:74 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\pages\shop\Setup.tsx
+  Line 192:33 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+  Line 198:33 - Unexpected any. Specify a different type. (@typescript-eslint/no-explicit-any)
+File: C:\Users\asus\OneDrive\Desktop\order-do\src\utils\qrUniqueness.ts
+  Line 45:5 - Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do nothing if the following line is error-free. (@typescript-eslint/ban-ts-comment)

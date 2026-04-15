@@ -8,6 +8,8 @@ interface SecureCanvasProps {
   className?: string;
   fontSize?: number;
   tagline?: string;
+  textAlign?: 'left' | 'center' | 'right';
+  shopName?: string;
 }
 
 export default function SecureCanvas({ 
@@ -17,24 +19,75 @@ export default function SecureCanvas({
   height = 200, 
   className = "", 
   fontSize = 18,
-  tagline = "Order-Do // Private"
+  tagline = "Order-Do // Private",
+  textAlign = 'left',
+  shopName = "Order-Do Cloud"
 }: SecureCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const applySecurityLayers = useCallback((ctx: CanvasRenderingContext2D) => {
+    // 3. PROMINENT FORENSIC WATERMARK (Diagonal & Visible)
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.08)'; // More visible
+    ctx.font = 'black 14px "Outfit", sans-serif';
+    const watermarkText = `PROPERTY OF ${shopName.toUpperCase()} // FORENSIC LOG ACTIVE`;
+    
+    ctx.translate(width / 2, height / 2);
+    ctx.rotate(-Math.PI / 4); // 45 degree angle
+    
+    // Draw multiple lines if it's a large canvas (like image)
+    if (image) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)'; // White watermark on photos
+        for(let i = -3; i <= 3; i++) {
+            ctx.fillText(watermarkText, -width, i * 40);
+        }
+    } else {
+        ctx.fillText(watermarkText, -width/1.5, 0);
+    }
+    ctx.restore();
+
+    // 4. STEGANOGRAPHIC NOISE WATERMARK (Subtle)
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.015)';
+    ctx.font = 'bold 8px monospace';
+    const hiddenText = `${tagline} • ${new Date().toLocaleTimeString()} • ${Math.random().toString(36).substring(7)}`;
+    
+    for (let y = 0; y < height; y += 100) {
+      for (let x = 0; x < width; x += 180) {
+        ctx.fillText(hiddenText, x, y);
+      }
+    }
+    ctx.restore();
+
+    // 4. STATIC NOISE OVERLAY (Simpler, faster)
+    ctx.save();
+    ctx.globalAlpha = 0.03;
+    for (let i = 0; i < 500; i++) {
+        ctx.fillStyle = Math.random() > 0.5 ? '#ffffff' : '#000000';
+        ctx.fillRect(Math.random() * width, Math.random() * height, 1, 1);
+    }
+    ctx.restore();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [width, height, tagline]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
 
-    // Clear
-    ctx.clearRect(0, 0, width, height);
+    // Clear and draw background
+    const isTransparent = className.includes('bg-transparent');
+    const isDark = document.documentElement.classList.contains('dark');
 
-    // Background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, width, height);
+    if (!isTransparent) {
+      ctx.fillStyle = isDark ? '#1e293b' : '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+    } else {
+      ctx.clearRect(0, 0, width, height);
+    }
 
-    // 1. DRAW IMAGE (if any)
     if (image) {
       const img = new Image();
       img.src = image;
@@ -43,58 +96,38 @@ export default function SecureCanvas({
         applySecurityLayers(ctx);
       };
     } else {
-      // 2. DRAW TEXT
-      ctx.fillStyle = '#1e293b'; // slate-800
-      ctx.font = `bold ${fontSize}px Inter, sans-serif`;
+      // Dynamic text color based on theme and background
+      ctx.fillStyle = isTransparent 
+        ? (isDark ? '#e2e8f0' : '#0f172a') 
+        : (isDark ? '#64748b' : '#0f172a');
+        
+      ctx.font = `bold ${fontSize}px "Outfit", "Inter", sans-serif`;
       ctx.textBaseline = 'top';
+      ctx.textAlign = textAlign;
+
+      const xPos = textAlign === 'center' ? width / 2 : textAlign === 'right' ? width : 0;
 
       if (Array.isArray(content)) {
         content.forEach((line, idx) => {
-          ctx.fillText(line, 20, 20 + idx * (fontSize + 8));
+          ctx.fillText(line, xPos, 0 + idx * (fontSize + 4));
         });
       } else if (content) {
-        ctx.fillText(content, 20, 20);
+        ctx.fillText(content, xPos, 0);
       }
       
       applySecurityLayers(ctx);
     }
-  }, [content, image, width, height, fontSize]);
-
-  const applySecurityLayers = (ctx: CanvasRenderingContext2D) => {
-    // 3. STEGANOGRAPHIC WATERMARK (Nearly Invisible)
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.008)'; // 0.8% opacity
-    ctx.font = '10px monospace';
-    const watermarkText = `${tagline} • ${new Date().toISOString()} • ORDER-DO SEAMLESS PROTECTION`;
-    for (let y = 0; y < height; y += 40) {
-      for (let x = 0; x < width; x += 150) {
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(-Math.PI / 6);
-        ctx.fillText(watermarkText, 0, 0);
-        ctx.restore();
-      }
-    }
-
-    // 4. DYNAMIC NOISE OVERLAY (Visible only on close inspection/screenshot)
-    const idata = ctx.getImageData(0, 0, width, height);
-    const data = idata.data;
-    for (let i = 0; i < data.length; i += 4) {
-        if (Math.random() < 0.05) { // 5% noise factor
-           // Add slight variance to RGB
-           data[i] = Math.min(255, data[i] + 5);
-           data[i+1] = Math.min(255, data[i+1] + 5);
-           data[i+2] = Math.min(255, data[i+2] + 5);
-        }
-    }
-    ctx.putImageData(idata, 0, 0);
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [content, image, width, height, fontSize, textAlign, applySecurityLayers]);
 
   useEffect(() => {
     draw();
   }, [draw]);
 
+  const hasBorder = !className.includes('border-none');
+
   return (
-    <div className={`secure-canvas-wrapper relative overflow-hidden rounded-2xl border-2 border-slate-100 dark:border-slate-800 select-none ${className}`}>
+    <div className={`secure-canvas-wrapper relative overflow-hidden select-none ${hasBorder ? 'rounded-2xl border-2 border-slate-100 dark:border-slate-800' : ''} ${className}`}>
       <canvas 
         ref={canvasRef} 
         width={width} 

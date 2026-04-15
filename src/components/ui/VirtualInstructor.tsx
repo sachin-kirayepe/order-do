@@ -19,6 +19,7 @@ function InstructorModel() {
   useEffect(() => {
     return () => {
       if (group.current) {
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         group.current.traverse((obj: any) => {
           if (obj.isMesh) {
             obj.geometry.dispose();
@@ -115,6 +116,7 @@ function ProfessionalFallback({ isSpeaking }: { isSpeaking: boolean }) {
   useEffect(() => {
     return () => {
       if (group.current) {
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         group.current.traverse((obj: any) => {
           if (obj.isMesh) {
             obj.geometry.dispose();

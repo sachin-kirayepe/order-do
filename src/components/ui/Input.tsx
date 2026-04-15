@@ -4,43 +4,49 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   icon?: React.ReactNode;
+  endIcon?: React.ReactNode;
+  labelClassName?: string;
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, icon, className = '', id, ...props }, ref) => {
-    const inputId = id || (label ? label.replace(/\s+/g, '-').toLowerCase() : Math.random().toString(36).substring(7));
-
+  ({ label, error, icon, endIcon, className = '', labelClassName = '', ...props }, ref) => {
     return (
-      <div className={`w-full ${className}`}>
+      <div className="w-full space-y-2">
         {label && (
-          <label htmlFor={inputId} className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+          <label className={`block text-xs font-black text-slate-400 uppercase tracking-[0.2em] italic px-1 ${labelClassName}`}>
             {label}
           </label>
         )}
-        <div className="relative rounded-xl shadow-sm">
+        <div className="relative group">
           {icon && (
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-primary transition-colors pointer-events-none">
               {icon}
             </div>
           )}
           <input
-            id={inputId}
             ref={ref}
-            className={`block w-full rounded-xl bg-white dark:bg-slate-900 border ${
-              error ? 'border-red-300 text-red-900 focus:ring-red-500 focus:border-red-500' : 'border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:ring-kirana-green focus:border-kirana-green'
-            } ${icon ? 'pl-10' : 'pl-4'} pr-4 py-2.5 sm:text-sm transition-colors`}
+            className={`
+              w-full h-14 bg-white/5 border border-white/10 rounded-2xl px-4 
+              ${icon ? 'pl-12' : ''} ${endIcon ? 'pr-12' : ''}
+              text-white placeholder:text-slate-500 outline-none
+              focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary/40
+              transition-all duration-300 shadow-inner text-sm font-medium
+              ${className}
+            `}
             {...props}
           />
+          {endIcon && (
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-primary transition-colors cursor-pointer">
+              {endIcon}
+            </div>
+          )}
         </div>
-        {error && (
-          <p className="mt-1.5 text-sm text-red-500" id={`${inputId}-error`}>
-            {error}
-          </p>
-        )}
+        {error && <p className="text-[10px] font-black text-red-500 uppercase tracking-widest px-1 animate-pulse">{error}</p>}
       </div>
     );
   }
 );
 
 Input.displayName = 'Input';
+
 export default Input;

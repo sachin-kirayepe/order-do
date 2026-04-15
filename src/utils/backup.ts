@@ -33,27 +33,55 @@ export function downloadJSON(json: string, filename: string) {
 
 /**
  * Import a backup JSON file and restore into Dexie.
+ * TC-017 FIX: Validates schema before importing to prevent corruption.
  * Returns count of items restored.
  */
 export async function importBackup(file: File): Promise<number> {
   const text = await file.text();
-  const backup = JSON.parse(text);
+  
+  let backup: any;
+  try {
+    backup = JSON.parse(text);
+  } catch {
+    throw new Error('Invalid JSON file');
+  }
 
-  if (!backup?.data) throw new Error('Invalid backup file');
+  if (!backup?.data || typeof backup.data !== 'object') {
+    throw new Error('Invalid backup file: missing data field');
+  }
+
+  // TC-017: Validate structure — reject prototype pollution attempts
+  const sanitize = (arr: any[], requiredKeys: string[]): any[] => {
+    if (!Array.isArray(arr)) return [];
+    return arr.filter(item => {
+      // Block prototype pollution
+      if ('__proto__' in item || 'constructor' in item || 'prototype' in item) {
+        console.warn('[Backup] Blocked suspicious prototype key in import data');
+        return false;
+      }
+      // Validate required keys exist
+      return requiredKeys.every(key => key in item);
+    });
+  };
 
   let count = 0;
 
-  if (backup.data.shopProfile?.length) {
-    await db.shopProfile.bulkPut(backup.data.shopProfile);
-    count += backup.data.shopProfile.length;
+  const validProfiles = sanitize(backup.data.shopProfile || [], ['id', 'shopId', 'shopName']);
+  if (validProfiles.length) {
+    await db.shopProfile.bulkPut(validProfiles);
+    count += validProfiles.length;
   }
-  if (backup.data.pendingOrders?.length) {
-    await db.pendingOrders.bulkPut(backup.data.pendingOrders);
-    count += backup.data.pendingOrders.length;
+
+  const validPending = sanitize(backup.data.pendingOrders || [], ['id', 'shopId', 'items']);
+  if (validPending.length) {
+    await db.pendingOrders.bulkPut(validPending);
+    count += validPending.length;
   }
-  if (backup.data.orderHistory?.length) {
-    await db.orderHistory.bulkPut(backup.data.orderHistory);
-    count += backup.data.orderHistory.length;
+
+  const validHistory = sanitize(backup.data.orderHistory || [], ['id', 'shopId', 'items', 'total']);
+  if (validHistory.length) {
+    await db.orderHistory.bulkPut(validHistory);
+    count += validHistory.length;
   }
 
   return count;

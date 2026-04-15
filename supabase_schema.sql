@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS public.plans (
     description TEXT,
     monthly_price NUMERIC DEFAULT 0,
     yearly_price NUMERIC DEFAULT 0,
+    duration_days INTEGER DEFAULT 30, -- Source of truth for automation
     features JSONB DEFAULT '{}'::jsonb,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT NOW()
@@ -20,6 +21,7 @@ CREATE TABLE IF NOT EXISTS public.shops_profile (
     address TEXT,
     upi_id TEXT,
     shop_type TEXT,
+    role TEXT DEFAULT 'shop',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -31,6 +33,8 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
     status TEXT DEFAULT 'active' CHECK (status IN ('active', 'expired', 'pending')),
     start_date TIMESTAMPTZ DEFAULT NOW(),
     expiry_date TIMESTAMPTZ,
+    is_auto_mode BOOLEAN DEFAULT true, -- Automation Toggle
+    last_manual_override_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -41,6 +45,7 @@ CREATE TABLE IF NOT EXISTS public.payments (
     plan_id INTEGER REFERENCES public.plans(id),
     amount NUMERIC NOT NULL,
     utr TEXT,
+    duration_days INTEGER DEFAULT 30, -- Added for Monthly/Yearly distinction
     status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'rejected')),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -69,8 +74,36 @@ ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.admin_settings ENABLE ROW LEVEL SECURITY;
 
--- POLICIES (Simplified for Admin usage)
+-- ADMIN CHECK FUNCTION (Prevents Infinite Recursion)
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+DECLARE
+    is_adm BOOLEAN;
+BEGIN
+    SELECT role = 'admin' INTO is_adm FROM public.shops_profile WHERE id = auth.uid();
+    RETURN COALESCE(is_adm, false);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- POLICIES (Hardened for Production)
 CREATE POLICY "Public plans are viewable by everyone" ON public.plans FOR SELECT USING (true);
-CREATE POLICY "Shops can view/edit their own profile" ON public.shops_profile FOR ALL USING (auth.uid() = id);
-CREATE POLICY "Shops can view their own subscription" ON public.subscriptions FOR SELECT USING (auth.uid() = shop_id);
-CREATE POLICY "Shops can view their own payments" ON public.payments FOR SELECT USING (auth.uid() = shop_id);
+CREATE POLICY "Shops can view/edit their own profile" ON public.shops_profile FOR ALL USING (auth.uid() = id OR public.is_admin());
+CREATE POLICY "Shops can view their own subscription" ON public.subscriptions FOR SELECT USING (auth.uid() = shop_id OR public.is_admin());
+CREATE POLICY "Shops can view their own payments" ON public.payments FOR SELECT USING (auth.uid() = shop_id OR public.is_admin());
+
+-- 6. PAYMENT HISTORY (Audit Log)
+CREATE TABLE IF NOT EXISTS public.payment_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    shop_id UUID REFERENCES public.shops_profile(id),
+    admin_id UUID REFERENCES auth.users(id),
+    plan_id INTEGER REFERENCES public.plans(id),
+    amount NUMERIC NOT NULL,
+    payment_method TEXT,
+    utr_number TEXT,
+    duration_days INTEGER DEFAULT 30,
+    confirmed_at TIMESTAMPTZ DEFAULT NOW(),
+    status TEXT DEFAULT 'confirmed'
+);
+
+ALTER TABLE public.payment_history ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Shops can view their own history" ON public.payment_history FOR SELECT USING (auth.uid() = shop_id OR public.is_admin());

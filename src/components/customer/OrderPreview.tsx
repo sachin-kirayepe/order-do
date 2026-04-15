@@ -36,7 +36,9 @@ export default function OrderPreview({
       if (item.price) sum += item.price;
       else missing = true;
     });
-    return { totalAmount: sum, hasUnpricedItems: missing };
+    // TC-055 FIX: Round total to 2 decimal places
+    const roundedTotal = Math.round(sum * 100) / 100;
+    return { totalAmount: roundedTotal, hasUnpricedItems: missing };
   }, [items]);
 
   const canSubmit = !!photo && !!customerName && !!customerAddress && items.length > 0;

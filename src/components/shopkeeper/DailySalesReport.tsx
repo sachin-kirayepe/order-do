@@ -14,8 +14,7 @@ import {
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { hi } from 'date-fns/locale';
 import { motion } from 'framer-motion';
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+// Late-imported: jsPDF from 'jspdf'
 import { toast } from 'sonner';
 import { useLanguage } from '../../context/LanguageContext';
 
@@ -128,8 +127,11 @@ export default function DailySalesReport({ shopId }: DailySalesReportProps) {
   };
 
   // Export PDF
-  const exportPDF = () => {
+  const exportPDF = async () => {
     try {
+      const { jsPDF } = await import('jspdf');
+      await import('jspdf-autotable');
+      
       const doc = new jsPDF();
       const dateStr = format(new Date(), 'dd MMM yyyy');
       

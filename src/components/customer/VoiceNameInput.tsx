@@ -31,11 +31,19 @@ export default function VoiceNameInput({ onNameSet }: VoiceNameInputProps) {
     if (!enteredName || enteredName.length < 2) return;
     try {
       const history = await db.orderHistory.limit(100).toArray();
-      const match = history.find(h => {
+      let match = false;
+      const lowerEntered = enteredName.toLowerCase();
+      
+      for (const h of history) {
         try {
-          return decrypt(h.customerName).toLowerCase() === enteredName.toLowerCase();
-        } catch { return false; }
-      });
+          const decName = await decrypt(h.customerName);
+          if (decName.toLowerCase() === lowerEntered) {
+            match = true;
+            break;
+          }
+        } catch { continue; }
+      }
+
       if (match) {
         setIsReturning(true);
         toast.success(`Namaste! Welcome back, ${enteredName}!`, {

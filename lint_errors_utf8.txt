@@ -1,0 +1,554 @@
+﻿
+> order-do@0.0.0 lint
+> eslint .
+
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\CameraCapture.tsx
+   57:7   error    Error: Cannot access variable before it is declared
+
+`initLandmarker` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\CameraCapture.tsx:57:7
+  55 |   useEffect(() => {
+  56 |     if (hasConsent) {
+> 57 |       initLandmarker();
+     |       ^^^^^^^^^^^^^^ `initLandmarker` accessed before it is declared
+  58 |       startCamera();
+  59 |       startTimer();
+  60 |     }
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\CameraCapture.tsx:84:3
+   82 |   };
+   83 |
+>  84 |   const initLandmarker = async () => {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  85 |     try {
+      | ^^^^^^^^^
+>  86 |       const filesetResolver = await FilesetResolver.forVisionTasks(
+      ΓÇª
+      | ^^^^^^^^^
+> 101 |     }
+      | ^^^^^^^^^
+> 102 |   };
+      | ^^^^^ `initLandmarker` is declared here
+  103 |
+  104 |   const startCamera = async () => {
+  105 |     setLoading(true);                                                                                                              react-hooks/immutability
+   58:7   error    Error: Cannot access variable before it is declared
+
+`startCamera` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\CameraCapture.tsx:58:7
+  56 |     if (hasConsent) {
+  57 |       initLandmarker();
+> 58 |       startCamera();
+     |       ^^^^^^^^^^^ `startCamera` accessed before it is declared
+  59 |       startTimer();
+  60 |     }
+  61 |     return () => {
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\CameraCapture.tsx:104:3
+  102 |   };
+  103 |
+> 104 |   const startCamera = async () => {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 105 |     setLoading(true);
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 106 |     setError('');
+      ΓÇª
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 123 |     }
+      | ^^^^^^^^^^^^^^^^^^^^^
+> 124 |   };
+      | ^^^^^ `startCamera` is declared here
+  125 |
+  126 |   const processVideoFrame = async () => {
+  127 |     const video = videoRef.current;                                                                                                              react-hooks/immutability
+   59:7   error    Error: Cannot access variable before it is declared
+
+`startTimer` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\CameraCapture.tsx:59:7
+  57 |       initLandmarker();
+  58 |       startCamera();
+> 59 |       startTimer();
+     |       ^^^^^^^^^^ `startTimer` accessed before it is declared
+  60 |     }
+  61 |     return () => {
+  62 |       stopCamera();
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\CameraCapture.tsx:68:3
+  66 |   }, [hasConsent]);
+  67 |
+> 68 |   const startTimer = () => {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 69 |     if (timerRef.current) clearInterval(timerRef.current);
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 70 |     setTimer(30);
+     ΓÇª
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 81 |     }, 1000);
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 82 |   };
+     | ^^^^^ `startTimer` is declared here
+  83 |
+  84 |   const initLandmarker = async () => {
+  85 |     try {     react-hooks/immutability
+   62:7   error    Error: Cannot access variable before it is declared
+
+`stopCamera` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\CameraCapture.tsx:62:7
+  60 |     }
+  61 |     return () => {
+> 62 |       stopCamera();
+     |       ^^^^^^^^^^ `stopCamera` accessed before it is declared
+  63 |       if (requestRef.current) cancelAnimationFrame(requestRef.current);
+  64 |       if (timerRef.current) clearInterval(timerRef.current);
+  65 |     };
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\CameraCapture.tsx:223:3
+  221 |   }, [hasConsent, loading, speak, language]);
+  222 |
+> 223 |   const stopCamera = () => {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 224 |     stream?.getTracks().forEach((t) => t.stop());
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 225 |   };
+      | ^^^^^ `stopCamera` is declared here
+  226 |
+  227 |   const capturePhoto = async () => {
+  228 |     const video = videoRef.current;                                                                       react-hooks/immutability
+   66:6   warning  React Hook useEffect has missing dependencies: 'startCamera', 'startTimer', and 'stopCamera'. Either include them or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            react-hooks/exhaustive-deps
+  134:54  error    Error: Cannot call impure function during render
+
+`performance.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\CameraCapture.tsx:134:54
+  132 |     }
+  133 |
+> 134 |     const results = landmarker.detectForVideo(video, performance.now());
+      |                                                      ^^^^^^^^^^^^^^^^^ Cannot call impure function
+  135 |     const detectedFaces = results.faceLandmarks || [];
+  136 |     const detected = detectedFaces.length > 0;
+  137 |     setIsFaceDetected(detected);                                                                                                                                                                                                                                                                                                                                                             react-hooks/purity
+  141:9   error    Error: Cannot call impure function during render
+
+`performance.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\CameraCapture.tsx:141:9
+  139 |
+  140 |     // Environment analysis (every 30 frames for performance)
+> 141 |     if (performance.now() - lastEnvCheckRef.current > 1000) {
+      |         ^^^^^^^^^^^^^^^^^ Cannot call impure function
+  142 |       const canvas = document.createElement('canvas');
+  143 |       canvas.width = video.videoWidth;
+  144 |       canvas.height = video.videoHeight;                                                                                                                                                                                                                                                                                                                                                              react-hooks/purity
+  150:35  error    Error: Cannot call impure function during render
+
+`performance.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\CameraCapture.tsx:150:35
+  148 |         const analysis = analyzeEnvironment(ctx, canvas.width, canvas.height);
+  149 |         setEnvFeedback({ isTooDark: analysis.isTooDark, isTooBright: analysis.isTooBright, isBlurry: analysis.isBlurry });
+> 150 |         lastEnvCheckRef.current = performance.now();
+      |                                   ^^^^^^^^^^^^^^^^^ Cannot call impure function
+  151 |       }
+  152 |     }
+  153 |                                                                                                                                                                                                                                                                                                                         react-hooks/purity
+  180:35  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-explicit-any
+  181:26  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-explicit-any
+  181:35  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-explicit-any
+  209:9   error    Error: Cannot access variable before it is declared
+
+`capturePhoto` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\CameraCapture.tsx:209:9
+  207 |       setIsCapturing(true);
+  208 |       setTimeout(() => {
+> 209 |         capturePhoto();
+      |         ^^^^^^^^^^^^ `capturePhoto` accessed before it is declared
+  210 |       }, 500);
+  211 |     }
+  212 |   }, [livenessStep, speak, language]);
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\CameraCapture.tsx:227:3
+  225 |   };
+  226 |
+> 227 |   const capturePhoto = async () => {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 228 |     const video = videoRef.current;
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 229 |     const canvas = canvasRef.current;
+      ΓÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 262 |     setCompressing(false);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 263 |   };
+      | ^^^^^ `capturePhoto` is declared here
+  264 |
+  265 |   const retake = () => {
+  266 |     setCaptured(null);  react-hooks/immutability
+  212:6   warning  React Hook useEffect has missing dependencies: 'capturePhoto' and 'isCapturing'. Either include them or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         react-hooks/exhaustive-deps
+  221:6   warning  React Hook useEffect has a missing dependency: 'livenessStep'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             react-hooks/exhaustive-deps
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\VoiceAddressInput.tsx
+  12:14  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  12:51  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  20:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  37:28  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\VoiceItemList.tsx
+  12:14  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  12:51  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  35:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  65:28  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\customer\VoiceNameInput.tsx
+  15:14  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  15:51  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  24:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  64:28  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\shopkeeper\DailySalesReport.tsx
+  147:15  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  162:51  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  164:15  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  165:25  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\shopkeeper\MultiQRGenerator.tsx
+  109:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\shopkeeper\VoiceSettings.tsx
+  41:35  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\Confetti.tsx
+  23:26  error  Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\Confetti.tsx:23:26
+  21 |         <div className="fixed inset-0 pointer-events-none z-[100] overflow-hidden">
+  22 |           {particles.map((_, i) => {
+> 23 |             const size = Math.random() * 8 + 4;
+     |                          ^^^^^^^^^^^^^ Cannot call impure function
+  24 |             const color = colors[Math.floor(Math.random() * colors.length)];
+  25 |             const xDelta = (Math.random() - 0.5) * 400; // spread
+  26 |               react-hooks/purity
+  24:45  error  Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\Confetti.tsx:24:45
+  22 |           {particles.map((_, i) => {
+  23 |             const size = Math.random() * 8 + 4;
+> 24 |             const color = colors[Math.floor(Math.random() * colors.length)];
+     |                                             ^^^^^^^^^^^^^ Cannot call impure function
+  25 |             const xDelta = (Math.random() - 0.5) * 400; // spread
+  26 |             
+  27 |             return (                                              react-hooks/purity
+  25:29  error  Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\Confetti.tsx:25:29
+  23 |             const size = Math.random() * 8 + 4;
+  24 |             const color = colors[Math.floor(Math.random() * colors.length)];
+> 25 |             const xDelta = (Math.random() - 0.5) * 400; // spread
+     |                             ^^^^^^^^^^^^^ Cannot call impure function
+  26 |             
+  27 |             return (
+  28 |               <motion.div                                                                         react-hooks/purity
+  45:29  error  Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\Confetti.tsx:45:29
+  43 |                 }}
+  44 |                 transition={{ 
+> 45 |                   duration: Math.random() * 2 + 1.5, 
+     |                             ^^^^^^^^^^^^^ Cannot call impure function
+  46 |                   ease: [0.23, 0.82, 0.43, 0.95],
+  47 |                   delay: Math.random() * 0.2
+  48 |                 }}                                                                                                          react-hooks/purity
+  47:26  error  Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\Confetti.tsx:47:26
+  45 |                   duration: Math.random() * 2 + 1.5, 
+  46 |                   ease: [0.23, 0.82, 0.43, 0.95],
+> 47 |                   delay: Math.random() * 0.2
+     |                          ^^^^^^^^^^^^^ Cannot call impure function
+  48 |                 }}
+  49 |                 style={{
+  50 |                   position: 'absolute',                                                                                              react-hooks/purity
+  54:33  error  Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\Confetti.tsx:54:33
+  52 |                   height: size,
+  53 |                   backgroundColor: color,
+> 54 |                   borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+     |                                 ^^^^^^^^^^^^^ Cannot call impure function
+  55 |                   boxShadow: '0:4px 6px -1px rgb(0 0 0 / 0.1)',
+  56 |                 }}
+  57 |               />                                                                             react-hooks/purity
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\ErrorBoundary.tsx
+  18:42  error  '_' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\Input.tsx
+  12:79  error  Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\Input.tsx:12:79
+  10 | const Input = forwardRef<HTMLInputElement, InputProps>(
+  11 |   ({ label, error, icon, endIcon, className = '', id, ...props }, ref) => {
+> 12 |     const inputId = id || (label ? label.replace(/\s+/g, '-').toLowerCase() : Math.random().toString(36).substring(7));
+     |                                                                               ^^^^^^^^^^^^^ Cannot call impure function
+  13 |
+  14 |     return (
+  15 |       <div className={`w-full ${className}`}>  react-hooks/purity
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\InstallPrompt.tsx
+  8:56  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\OfflineBanner.tsx
+  15:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\OfflineBanner.tsx:15:7
+  13 |     // Localhost is usually considered secure by browsers, so we check for production
+  14 |     if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+> 15 |       setInsecure(true);
+     |       ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  16 |     }
+  17 |
+  18 |     const goOffline = () => setOffline(true);  react-hooks/set-state-in-effect
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\PrivacyConsent.tsx
+  17:11  error  't' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\ProtectionOverlay.tsx
+  10:9  error  Unexpected empty object pattern  no-empty-pattern
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\PullToRefresh.tsx
+  1:27  error  'useRef' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\SecureCanvas.tsx
+  53:28  error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `className`, but the source dependencies were [content, image, width, height, fontSize, applySecurityLayers]. Inferred different dependency than source.
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\components\ui\SecureCanvas.tsx:53:28
+  51 |   }, [width, height, tagline]);
+  52 |
+> 53 |   const draw = useCallback(() => {
+     |                            ^^^^^^^
+> 54 |     const canvas = canvasRef.current;
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 55 |     if (!canvas) return;
+     ΓÇª
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 95 |     }
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 96 |   }, [content, image, width, height, fontSize, applySecurityLayers]);
+     | ^^^^ Could not preserve existing manual memoization
+  97 |
+  98 |   useEffect(() => {
+  99 |     draw();  react-hooks/preserve-manual-memoization
+  96:6   warning  React Hook useCallback has a missing dependency: 'className'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  react-hooks/exhaustive-deps
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\context\AuthContext.tsx
+  36:12  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      @typescript-eslint/no-explicit-any
+  37:7   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\context\AuthContext.tsx:37:7
+  35 |         user_metadata: { full_name: 'Mock User' }
+  36 |       } as any;
+> 37 |       setUser(mockUser);
+     |       ^^^^^^^ Avoid calling setState() directly within an effect
+  38 |       setSession({ user: mockUser } as any);
+  39 |       setLoading(false);
+  40 |       return;  react-hooks/set-state-in-effect
+  38:40  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      @typescript-eslint/no-explicit-any
+  73:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                react-refresh/only-export-components
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\context\LanguageContext.tsx
+  25:18  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  48:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\context\SubscriptionContext.tsx
+   55:30  error    'error' is assigned a value but never used                                                                                      @typescript-eslint/no-unused-vars
+   70:36  error    Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+   83:6   warning  React Hook useEffect has a missing dependency: 'fetchSubscription'. Either include it or remove the dependency array            react-hooks/exhaustive-deps
+  117:14  error    Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\context\ThemeContext.tsx
+  64:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\context\VoiceContext.tsx
+    4:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+   92:59  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  100:63  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  101:24  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  157:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\hooks\useSound.ts
+  10:63  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  43:63  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\pages\Landing.tsx
+  17:56  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\pages\admin\AdminLayout.tsx
+   5:3  error  'CreditCard' is defined but never used  @typescript-eslint/no-unused-vars
+  13:3  error  'TrendingUp' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\pages\admin\Payments.tsx
+   5:3   error  'CheckCircle2' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+   6:3   error  'XCircle' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  13:8   error  'Button' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+  38:35  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/no-explicit-any
+  43:5   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\pages\admin\Payments.tsx:43:5
+  41 |
+  42 |   useEffect(() => {
+> 43 |     fetchPayments();
+     |     ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  44 |   }, []);
+  45 |
+  46 |   const handleAction = async (paymentId: string, action: 'confirmed' | 'rejected', shopId: string, planId: number) => {  react-hooks/set-state-in-effect
+  48:15  error  'error' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+  66:14  error  'err' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                @typescript-eslint/no-unused-vars
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\pages\admin\Plans.tsx
+   53:5   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\pages\admin\Plans.tsx:53:5
+  51 |
+  52 |   useEffect(() => {
+> 53 |     fetchPlans();
+     |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  54 |   }, []);
+  55 |
+  56 |   const handleSave = async () => {  react-hooks/set-state-in-effect
+   67:14  error  'err' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+   77:9   error  Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do nothing if the following line is error-free                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/ban-ts-comment
+  124:23  error  Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do nothing if the following line is error-free                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/ban-ts-comment
+  131:22  error  Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do nothing if the following line is error-free                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/ban-ts-comment
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\pages\admin\Settings.tsx
+   4:3  error  'ShieldCheck' is defined but never used   @typescript-eslint/no-unused-vars
+   5:3  error  'SwitchCamera' is defined but never used  @typescript-eslint/no-unused-vars
+  10:3  error  'Settings' is defined but never used      @typescript-eslint/no-unused-vars
+  13:8  error  'Button' is defined but never used        @typescript-eslint/no-unused-vars
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\pages\admin\Shops.tsx
+  10:3   error  'Filter' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+  14:8   error  'Input' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  46:32  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  51:5   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\pages\admin\Shops.tsx:51:5
+  49 |
+  50 |   useEffect(() => {
+> 51 |     fetchShops();
+     |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  52 |   }, []);
+  53 |
+  54 |   const handleManualActivate = async (shopId: string) => {  react-hooks/set-state-in-effect
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\pages\order\OrderFlow.tsx
+   27:14  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   27:51  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   31:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   59:50  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   63:52  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   81:27  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  131:28  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  187:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\pages\shop\Dashboard.tsx
+   40:14   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+   40:51   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+   71:34   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+  170:6    warning  React Hook useEffect has a missing dependency: 'speak'. Either include it or remove the dependency array                     react-hooks/exhaustive-deps
+  204:6    warning  React Hook useCallback has missing dependencies: 'language' and 'speak'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  245:14   error    'err' is defined but never used                                                                                              @typescript-eslint/no-unused-vars
+  615:42   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+  801:97   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+  802:117  error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+  804:97   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+  805:117  error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\pages\shop\KDSView.tsx
+   56:74  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-explicit-any
+  109:5   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\pages\shop\KDSView.tsx:109:5
+  107 |   useEffect(() => {
+  108 |     if (!profile) return;
+> 109 |     refresh();
+      |     ^^^^^^^ Avoid calling setState() directly within an effect
+  110 |     const interval = setInterval(refresh, 3000);
+  111 |     return () => clearInterval(interval);
+  112 |   }, [profile, refresh]);  react-hooks/set-state-in-effect
+  239:34  error  Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\pages\shop\KDSView.tsx:239:34
+  237 |   const { t } = useLanguage();
+  238 |   const customerName = decrypt(order.customerName);
+> 239 |   const minutesAgo = Math.floor((Date.now() - order.createdAt) / 60000);
+      |                                  ^^^^^^^^^^ Cannot call impure function
+  240 |   const isUrgent = minutesAgo >= 10;
+  241 |
+  242 |   return (                                                                                                                                                                                                                                                                                                                                                  react-hooks/purity
+
+C:\Users\asus\OneDrive\Desktop\order-do\src\pages\shop\Setup.tsx
+  184:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  190:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+Γ£û 112 problems (105 errors, 7 warnings)
+

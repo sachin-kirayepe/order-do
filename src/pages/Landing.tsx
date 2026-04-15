@@ -1,32 +1,38 @@
 import { useEffect, useState } from 'react';
-import { Store, ShoppingCart, Moon, Sun, Download, Shield } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { Store, ShoppingCart, Moon, Sun, Download, Shield, X, Eye, EyeOff, AlertTriangle, Sparkles, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../context/ThemeContext';
-import { useLanguage } from '../context/LanguageContext';
-import LanguageSwitcher from '../components/ui/LanguageSwitcher';
 import { useAuth } from '../context/AuthContext';
-import { useTalkingCharacter } from '../context/TalkingCharacterContext';
+import { useVoice } from '../context/VoiceContext';
+import { useLanguage } from '../context/LanguageContext';
+import { supabase } from '../lib/supabase';
+import LanguageSwitcher from '../components/ui/LanguageSwitcher';
+import Footer from '../components/ui/Footer';
+import Button from '../components/ui/Button';
+import GlassCard from '../components/ui/GlassCard';
+import Input from '../components/ui/Input';
 
 export default function Home() {
   const { theme, toggleTheme } = useTheme();
-  const { t, language } = useLanguage();
+  const { language, t } = useLanguage();
   const { user, isAdmin } = useAuth();
-  const { speak } = useTalkingCharacter();
+  const { speak } = useVoice();
   const navigate = useNavigate();
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState(false);
 
-  useEffect(() => {
-    // Initial Welcome Greeting
-    const timer = setTimeout(() => {
-      speak(
-        language === 'hi' 
-          ? 'नमस्ते! मैं धरा हूँ। ऑर्डर-\\दो\\ में आपका स्वागत है। आप दुकान खोल सकते हैं या ऑर्डर शुरू कर सकते हैं।' 
-          : 'Namaste! I am Dhara. Welcome to Order-\\Do\\. You can open your shop or start an order.'
-      );
-    }, 1500);
+  // Admin login modal state
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminError, setAdminError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutUntil, setLockoutUntil] = useState(0);
 
+  useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -36,9 +42,15 @@ export default function Home() {
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      clearTimeout(timer);
     };
-  }, [speak, language]);
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      speak('WELCOME');
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [speak]);
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
@@ -48,138 +60,329 @@ export default function Home() {
     setDeferredPrompt(null);
   };
 
+  const handleAdminButtonClick = () => {
+    if (user && isAdmin) {
+      navigate('/admin');
+      return;
+    }
+    setShowAdminLogin(true);
+  };
+
+  const handleAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const now = Date.now();
+    if (now < lockoutUntil) {
+      const waitTime = Math.ceil((lockoutUntil - now) / 1000);
+      setAdminError(`⚠️ Security Protocol: Wait ${waitTime}s before retry.`);
+      return;
+    }
+
+    if (!adminEmail.trim() || !adminPassword.trim()) {
+      setAdminError('❌ Identity and Access Code required.');
+      return;
+    }
+
+    setAdminLoading(true);
+    setAdminError('');
+
+    try {
+      console.log('[Admin] Attempting master authorization...');
+      
+      // Nuclear clear of potentially stale Supabase state before we attempt login
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+        localStorage.removeItem('supabase.auth.token');
+      } catch (err) {
+        console.warn('Silent local signout failed', err);
+      }
+      
+      const loginPromise = supabase.auth.signInWithPassword({
+        email: adminEmail.trim(),
+        password: adminPassword.trim()
+      });
+
+      // 10-second aggressive timeout to prevent infinite hang in the modal
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('CONNECTION_TIMEOUT')), 10000)
+      );
+
+      const { data, error } = await Promise.race([loginPromise, timeoutPromise]) as any;
+
+      if (error) {
+        console.error('[Admin] Login error:', error.message);
+        
+        const newFailedAttempts = failedAttempts + 1;
+        setFailedAttempts(newFailedAttempts);
+        
+        let msg = error.message;
+        if (msg.includes('Invalid login credentials')) {
+          msg = '❌ Invalid Access Code - Authorization Denied.';
+        } else if (msg.includes('Refresh Token Not Found')) {
+          msg = '🔄 Session expired. Please refresh the page and try again.';
+          localStorage.clear();
+        } else if (msg.includes('CONNECTION_TIMEOUT')) {
+          msg = '📡 Connection timed out. Please try again.';
+          localStorage.clear();
+        }
+        
+        setAdminError(msg);
+        
+        if (newFailedAttempts >= 5) {
+          const timeout = 30000;
+          setLockoutUntil(Date.now() + timeout);
+          setAdminError(`⛔ Security Lockout: ${timeout/1000}s.`);
+        }
+        
+        setAdminLoading(false);
+        return;
+      }
+
+      if (data.user?.email !== 'sachinkumar647422.tools@gmail.com') {
+        await supabase.auth.signOut();
+        setAdminError('⛔ Access Denied — You are not the master owner.');
+        setAdminLoading(false);
+        return;
+      }
+
+      console.log('[Admin] Authorization granted. Accessing hub...');
+      
+      // Important: Ensure loading state ends so React can breathe
+      setAdminLoading(false);
+      setShowAdminLogin(false);
+      
+      // Delay navigation slightly to let Framer Motion close the modal first
+      setTimeout(() => navigate('/admin'), 100);
+    } catch (err: any) {
+      console.error('[Admin] Critical failure:', err);
+      let errMsg = err?.message || '📡 Secure connection failed. Try again.';
+      if (err?.message === 'CONNECTION_TIMEOUT') {
+         errMsg = '📡 Network timed out. Purging cache...';
+         localStorage.clear();
+      }
+      setAdminError(errMsg);
+      setAdminLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden transition-colors duration-300 bg-slate-50 dark:bg-slate-950">
-      {/* Background Image Layer */}
-      <div 
-        className="absolute inset-0 z-0 bg-cover bg-center opacity-30 dark:opacity-20 mix-blend-overlay pointer-events-none"
-        style={{ backgroundImage: 'url("/bg-shops.png")' }}
-      />
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 lg:p-12 relative overflow-hidden">
+      {/* Floating Animated Orbs */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
         <motion.div 
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 0.7, scale: 1 }}
-          transition={{ duration: 2, repeat: Infinity, repeatType: 'reverse' }}
-          className="absolute top-[-10%] right-[-5%] w-72 h-72 bg-kirana-green/20 rounded-full mix-blend-multiply filter blur-3xl dark:mix-blend-overlay"
+          animate={{ x: [0, 100, 0], y: [0, -50, 0] }}
+          transition={{ duration: 10, repeat: Infinity }}
+          className="absolute -top-20 -right-20 w-96 h-96 bg-brand-primary/10 rounded-full blur-[120px]" 
         />
         <motion.div 
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 0.7, scale: 1 }}
-          transition={{ duration: 2, delay: 1, repeat: Infinity, repeatType: 'reverse' }}
-          className="absolute bottom-[-10%] left-[-5%] w-72 h-72 bg-kirana-orange/20 rounded-full mix-blend-multiply filter blur-3xl dark:mix-blend-overlay"
+          animate={{ x: [0, -80, 0], y: [0, 100, 0] }}
+          transition={{ duration: 12, repeat: Infinity }}
+          className="absolute -bottom-40 -left-20 w-[30rem] h-[30rem] bg-brand-secondary/10 rounded-full blur-[150px]" 
         />
       </div>
 
+      {/* Floating Header */}
       <motion.div 
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="absolute top-4 right-4 flex gap-3 z-10 items-center"
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="fixed top-6 left-6 right-6 z-50 flex items-center justify-between pointer-events-none"
       >
-        <LanguageSwitcher />
-        <button
-          onClick={toggleTheme}
-          className="p-3 rounded-full bg-white dark:bg-slate-800 shadow-xl text-slate-800 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-90"
-        >
-          {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-        </button>
+        <div className="flex items-center gap-3 pointer-events-auto">
+          <div className="w-12 h-12 bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl rounded-2xl flex items-center justify-center border border-white/20 dark:border-white/5 shadow-premium">
+            <Sparkles className="text-brand-primary" size={24} />
+          </div>
+          <span className="hidden md:block font-black uppercase tracking-[0.3em] text-[10px] text-slate-500">Premium Version v2.0</span>
+        </div>
+
+        <div className="flex gap-2 pointer-events-auto bg-white/20 dark:bg-slate-900/20 backdrop-blur-md p-1.5 rounded-full border border-white/10 shadow-glass">
+          <LanguageSwitcher />
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="rounded-full w-10 h-10 !p-0"
+            onClick={toggleTheme}
+          >
+            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+          </Button>
+        </div>
       </motion.div>
 
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
-        className="relative z-10 w-full max-w-md p-8 rounded-[2rem] glass-panel text-center border border-white/20 dark:border-slate-700/50"
-      >
-
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="mb-8"
+      {/* Main Hero Card */}
+      <GlassCard intensity="high" className="w-full max-w-xl p-8 md:p-12 text-center relative z-10 border-white/50 dark:border-white/10">
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="mb-10"
         >
-          <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-md mb-6 shadow-2xl p-4 border border-white/20">
-            <img src="/logo.png" alt="Order-Do Logo" className="w-full h-full object-contain drop-shadow-lg" />
+          <div className="w-24 h-24 mx-auto mb-8 relative">
+            <motion.div 
+              animate={{ rotate: 360 }}
+              transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
+              className="absolute inset-0 bg-gradient-to-r from-brand-primary via-brand-secondary to-brand-primary rounded-[2rem] opacity-20 blur-xl"
+            />
+            <div className="relative w-full h-full bg-white dark:bg-slate-900 rounded-[2rem] border border-white/20 shadow-2xl flex items-center justify-center p-5 overflow-hidden">
+               <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
+            </div>
           </div>
-          <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white mb-2">
-            Order-<span className="text-kirana-green">Do</span>
+
+          <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-4">
+            <span className="text-slate-900 dark:text-white">Order-</span>
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-primary to-emerald-500">
+              {language === 'hi' ? 'दो' : 'Do'}
+            </span>
           </h1>
-          <p className="text-slate-600 dark:text-slate-300 font-medium">
+          
+          <p className="text-lg text-slate-600 dark:text-slate-400 font-medium max-w-sm mx-auto leading-relaxed">
             {t('customer.instruction')}
           </p>
         </motion.div>
 
-        <div className="space-y-4">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 }}
+        <div className="grid gap-5">
+          <Button 
+            variant="secondary" 
+            size="lg" 
+            className="w-full h-20 !rounded-[1.5rem]"
+            onClick={() => navigate('/shop/login')}
           >
-            <Link to="/shop/login" className="block w-full relative group overflow-hidden rounded-2xl p-[2px] focus:outline-none focus:ring-4 focus:ring-kirana-orange/50 active:scale-95 transition-all shadow-lg shadow-kirana-orange/10">
-              <span className="absolute inset-0 bg-gradient-to-r from-kirana-orange to-amber-500 opacity-100"></span>
-              <div className="relative flex items-center justify-center gap-3 w-full bg-white/10 backdrop-blur-sm px-6 py-4 rounded-[14px]">
-                <Store size={24} className="text-white" />
-                <span className="text-xl font-semibold text-white tracking-wide">{t('common.openShop')}</span>
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-white/20 rounded-xl"><Store size={24} /></div>
+                <div className="text-left">
+                  <div className="block">{t('common.openShop')}</div>
+                  <div className="text-[10px] opacity-60 normal-case italic font-medium -mt-1 tracking-normal">For Shop Owners</div>
+                </div>
               </div>
-            </Link>
-          </motion.div>
+              <ChevronRight size={20} className="opacity-40" />
+            </div>
+          </Button>
 
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4 }}
+          <Button 
+            variant="primary" 
+            size="lg" 
+            className="w-full h-20 !rounded-[1.5rem]"
+            onClick={() => navigate('/order')}
           >
-            <button 
-              onClick={() => alert(t('common.comingSoon'))}
-              className="w-full relative group overflow-hidden rounded-2xl p-[2px] focus:outline-none focus:ring-4 focus:ring-kirana-green/50 active:scale-95 transition-all shadow-lg shadow-kirana-green/10"
-            >
-              <span className="absolute inset-0 bg-gradient-to-r from-kirana-green to-emerald-500 opacity-100 opacity-80 group-hover:opacity-100"></span>
-              <div className="relative flex items-center justify-center gap-3 w-full bg-white/10 backdrop-blur-sm px-6 py-4 rounded-[14px]">
-                <ShoppingCart size={24} className="text-white" />
-                <span className="text-xl font-semibold text-white tracking-wide">{t('customer.startOrder')}</span>
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-white/20 rounded-xl"><ShoppingCart size={24} /></div>
+                <div className="text-left">
+                  <div className="block">{t('customer.startOrder')}</div>
+                  <div className="text-[10px] opacity-60 normal-case italic font-medium -mt-1 tracking-normal">Quick Voice Order</div>
+                </div>
               </div>
-            </button>
-          </motion.div>
+              <ChevronRight size={20} className="opacity-40" />
+            </div>
+          </Button>
 
-          {user && isAdmin && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="pt-2"
-            >
-               <button
-                onClick={() => navigate('/admin')}
-                className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-kirana-orange to-amber-600 text-white font-bold rounded-2xl shadow-lg hover:opacity-90 active:scale-95 transition-all text-sm"
-              >
-                <Shield size={18} />
-                {t('dashboard.adminPanel')}
-              </button>
-            </motion.div>
-          )}
+          <Button 
+            variant="outline" 
+            className="w-full py-4 !rounded-[1.25rem] border-slate-200 dark:border-white/5"
+            onClick={handleAdminButtonClick}
+          >
+            <Shield size={18} className="mr-2 text-brand-primary" />
+            Admin Panel
+          </Button>
         </div>
 
         {isInstallable && (
           <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700 text-left"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mt-12 pt-8 border-t border-slate-200 dark:border-white/5 flex items-center justify-between"
           >
-            <div className="flex items-center justify-between gap-4 bg-kirana-light dark:bg-slate-800 p-4 rounded-xl border border-kirana-green/20">
-              <div>
-                <h3 className="text-sm font-semibold text-kirana-dark dark:text-kirana-light uppercase tracking-wider">{t('common.installApp')}</h3>
-                <p className="text-xs text-kirana-green/80 dark:text-slate-400 mt-1">{t('common.installDesc')}</p>
-              </div>
-              <button 
-                onClick={handleInstallClick}
-                className="flex items-center justify-center w-10 h-10 bg-kirana-green text-white rounded-full hover:bg-kirana-dark active:scale-90 transition-all shadow-md shrink-0"
-              >
-                <Download size={18} />
-              </button>
+            <div className="text-left">
+              <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">{t('common.installApp')}</h4>
+              <p className="text-xs text-slate-500 font-medium">{t('common.installDesc')}</p>
             </div>
+            <Button size="sm" variant="ghost" className="rounded-full w-12 h-12 !p-0" onClick={handleInstallClick}>
+              <Download size={20} />
+            </Button>
           </motion.div>
         )}
-      </motion.div>
+      </GlassCard>
+
+      {/* Admin Login Modal */}
+      <AnimatePresence>
+        {showAdminLogin && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/80 backdrop-blur-3xl"
+              onClick={() => setShowAdminLogin(false)}
+            />
+            <GlassCard intensity="high" className="w-full max-w-sm p-0 overflow-hidden relative z-10 border-white/20">
+               <div className="p-8 bg-gradient-to-br from-slate-900 to-black text-center relative">
+                  <button 
+                    onClick={() => setShowAdminLogin(false)}
+                    className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                  <div className="w-20 h-20 bg-brand-primary/20 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 border border-brand-primary/30">
+                    <Shield size={36} className="text-brand-primary" />
+                  </div>
+                  <h3 className="text-2xl font-black text-white uppercase italic tracking-tight">Secure Vault</h3>
+                  <p className="text-[10px] text-brand-primary font-black uppercase tracking-[0.3em] mt-1">Authorized Access Only</p>
+               </div>
+               
+               <form onSubmit={handleAdminLogin} className="p-8 space-y-6">
+                 <div className="flex gap-3 bg-amber-500/10 p-4 rounded-2xl border border-amber-500/20">
+                    <AlertTriangle size={20} className="text-amber-500 shrink-0" />
+                    <p className="text-[10px] text-amber-200 font-bold leading-relaxed">
+                      Unauthorized access is strictly prohibited and logged. This panel is for management only.
+                    </p>
+                 </div>
+
+                 <Input 
+                   label="Identity (Email)" 
+                   placeholder="owner@order-do.com"
+                   value={adminEmail}
+                   onChange={(e) => setAdminEmail(e.target.value)}
+                   type="email"
+                   required
+                 />
+                 
+                 <div className="relative">
+                   <Input 
+                     label="Access Code" 
+                     placeholder="••••••••"
+                     type={showPassword ? 'text' : 'password'}
+                     value={adminPassword}
+                     onChange={(e) => setAdminPassword(e.target.value)}
+                     required
+                   />
+                   <button 
+                     type="button" 
+                     onClick={() => setShowPassword(!showPassword)}
+                     className="absolute right-4 bottom-3.5 text-slate-500"
+                   >
+                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                   </button>
+                 </div>
+
+                 <AnimatePresence>
+                   {adminError && (
+                     <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="text-[10px] font-black uppercase text-red-500 text-center tracking-wider">
+                       {adminError}
+                     </motion.p>
+                   )}
+                 </AnimatePresence>
+
+                 <Button 
+                   type="submit" 
+                   isLoading={adminLoading} 
+                   className="w-full py-4 shadow-2xl" 
+                   variant="primary"
+                 >
+                   Verify & unlock
+                 </Button>
+               </form>
+            </GlassCard>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <Footer />
     </div>
   );
 }

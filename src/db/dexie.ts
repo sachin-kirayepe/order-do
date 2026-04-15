@@ -41,6 +41,8 @@ export interface MenuItem {
 // ─── Order Interfaces ────────────────────────────────────────────────────────
 
 export interface OrderItem {
+  id?: number | string; // Reference to MenuItem id
+  shopId?: string;
   name: string;
   quantity: string;
   price?: number; // shopkeeper fills this
@@ -60,14 +62,19 @@ export interface PendingOrder {
   paymentStatus?: 'pending' | 'cod' | 'upi';
   paymentReceived?: boolean;
   customerPhone?: string;
+  short_id?: string; // NEW: Human readable short ID
 }
 
 export interface OrderHistory {
   id: string;
   shopId: string;
-  customerName: string;
-  customerAddress: string; // NEW: Compulsory address
-  photoDataUrl: string;
+  customerName: string; // Will be deleted after proof creation
+  customerAddress: string; // Will be deleted after proof creation
+  photoDataUrl: string; // Will be deleted after proof creation
+  proofBlurredPhoto?: string; // NEW: Blur version for shopkeeper proof
+  proofHashedName?: string; // NEW: SHA-256 hash for verify
+  orderToken?: string; // NEW: Token for auditing
+  short_id?: string; // NEW: Human readable short ID
   items: OrderItem[];
   total: number;
   status: 'completed' | 'rejected';
@@ -103,10 +110,10 @@ const db = new Dexie('OrderDoDatabase') as Dexie & {
   qrHistory: EntityTable<QrHistory, 'code'>;
 };
 
-db.version(9).stores({
+db.version(11).stores({
   shopProfile: 'id, shopId, phone',
-  pendingOrders: 'id, shopId, status, createdAt, paymentStatus',
-  orderHistory: 'id, shopId, status, createdAt, completedAt, paymentStatus',
+  pendingOrders: 'id, shopId, status, createdAt, paymentStatus, customerName, customerPhone, short_id',
+  orderHistory: 'id, shopId, status, createdAt, completedAt, paymentStatus, customerName, customerPhone, short_id',
   tempOrders: 'id, shopId, status, createdAt',
   menuItems: '++id, shopId, category, available',
   qrHistory: 'code, shopId, type',

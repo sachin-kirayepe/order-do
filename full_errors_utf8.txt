@@ -1,0 +1,21 @@
+﻿src/components/shopkeeper/VoiceSettings.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/components/ui/PrivacyConsent.tsx(17,9): error TS6133: 't' is declared but its value is never read.
+src/components/ui/PullToRefresh.tsx(1,27): error TS6133: 'useRef' is declared but its value is never read.
+src/components/ui/VoiceRepeatButton.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/context/SubscriptionContext.tsx(55,30): error TS6133: 'error' is declared but its value is never read.
+src/pages/admin/AdminLayout.tsx(5,3): error TS6133: 'CreditCard' is declared but its value is never read.
+src/pages/admin/AdminLayout.tsx(13,3): error TS6133: 'TrendingUp' is declared but its value is never read.
+src/pages/admin/Payments.tsx(5,3): error TS6133: 'CheckCircle2' is declared but its value is never read.
+src/pages/admin/Payments.tsx(6,3): error TS6133: 'XCircle' is declared but its value is never read.
+src/pages/admin/Payments.tsx(13,1): error TS6133: 'Button' is declared but its value is never read.
+src/pages/admin/Payments.tsx(48,13): error TS6133: 'error' is declared but its value is never read.
+src/pages/admin/Settings.tsx(4,3): error TS6133: 'ShieldCheck' is declared but its value is never read.
+src/pages/admin/Settings.tsx(5,3): error TS6133: 'SwitchCamera' is declared but its value is never read.
+src/pages/admin/Settings.tsx(10,3): error TS6133: 'Settings' is declared but its value is never read.
+src/pages/admin/Settings.tsx(13,1): error TS6133: 'Button' is declared but its value is never read.
+src/pages/admin/Shops.tsx(10,3): error TS6133: 'Filter' is declared but its value is never read.
+src/pages/admin/Shops.tsx(14,1): error TS6133: 'Input' is declared but its value is never read.
+src/pages/shop/Dashboard.tsx(191,62): error TS2339: Property 'tableId' does not exist on type 'PendingOrder'.
+src/pages/shop/Dashboard.tsx(191,80): error TS2339: Property 'counterId' does not exist on type 'PendingOrder'.
+src/pages/shop/Dashboard.tsx(206,27): error TS2304: Cannot find name 'useMemo'.
+src/pages/shop/Dashboard.tsx(686,48): error TS7006: Parameter 'h' implicitly has an 'any' type.

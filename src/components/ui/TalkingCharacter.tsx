@@ -59,7 +59,6 @@ export default function TalkingCharacter() {
         exit={{ opacity: 0, y: 50, scale: 0.8 }}
         className="fixed bottom-6 right-6 z-[9999] flex flex-col pointer-events-none"
       >
-        {/* Assistant UI controls */}
         <div className="absolute top-2 right-2 flex flex-col gap-2 z-50 pointer-events-auto">
            <button 
             onClick={toggleMute}
@@ -87,7 +86,6 @@ export default function TalkingCharacter() {
 
         {!minimized ? (
           <div className="flex-1 relative group pointer-events-auto flex items-center justify-center">
-            {/* Ambient Base Glow */}
             <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-kirana-green/20 to-transparent blur-3xl pointer-events-none opacity-50" />
             
             <AnimatePresence>
@@ -99,7 +97,7 @@ export default function TalkingCharacter() {
                     <Canvas 
                       shadows 
                       dpr={[1, 2]} 
-                      onCreated={({ gl }) => {
+                      onCreated={({ gl }: { gl: any }) => {
                         gl.setClearColor('#000000', 0);
                       }}
                       onError={() => setHasCanvasError(true)}
@@ -107,14 +105,12 @@ export default function TalkingCharacter() {
                         <VirtualInstructor />
                     </Canvas>
                 ) : (
-                    /* 2D PREMIUM ILLUSTRATION FALLBACK (100% VISIBLE) */
                     <motion.div 
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         className="w-full h-full flex flex-col items-center justify-end pb-8"
                     >
                         <div className="relative w-32 h-32 mb-4">
-                            {/* Stylish Dhara Illustration - Professional Face & Ponytail */}
                             <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-2xl animate-pulse" />
                             <div className="relative w-full h-full bg-gradient-to-br from-blue-50 to-blue-100 dark:from-slate-800 dark:to-slate-700 rounded-full border-4 border-white/50 dark:border-slate-700/50 shadow-xl overflow-hidden flex items-center justify-center p-2">
                                 <img 
@@ -122,12 +118,10 @@ export default function TalkingCharacter() {
                                     alt="Dhara" 
                                     className={`w-full h-full object-contain ${isSpeaking ? 'animate-bounce' : 'animate-float'}`} 
                                     onError={(e) => {
-                                        // If even the logo fails, use a Lucide icon
                                         (e.target as any).src = 'https://api.dicebear.com/7.x/avataaars/svg?seed=Dhara&baseColor=f5d0c5&clothing=collar&hair=long';
                                     }}
                                 />
                             </div>
-                            {/* Mouth Wave (2D LipSync) */}
                             {isSpeaking && (
                                 <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
                                     {[1,2,3].map(i => (
@@ -143,7 +137,6 @@ export default function TalkingCharacter() {
                 )}
             </div>
             
-            {/* Visual Action Cues */}
             {action !== 'idle' && (
                 <motion.div 
                     initial={{ scale: 0 }}

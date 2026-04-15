@@ -27,12 +27,19 @@
     <link rel="apple-touch-icon" href="/logo.png" />
     <link rel="manifest" href="/manifest.json" />
 
-    <!-- Fonts -->
+    <!-- Preconnect & Preload -->
+    <link rel="preconnect" href="https://qmeyotlilhwzcchdwhid.supabase.co">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" as="image" href="/logo.png">
+
+    <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <title>Order-Do — The Ultimate Shop App</title>
+    
+    <!-- TC-027: AdSense script removed — add with real publisher ID when approved -->
+    <!-- <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-YOUR_REAL_ID" crossorigin="anonymous"></script> -->
   </head>
   <body>
     <div id="root"></div>

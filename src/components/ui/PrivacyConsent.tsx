@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion';
 import { ShieldCheck, EyeOff, AlertCircle } from 'lucide-react';
-import { useLanguage } from '../../context/LanguageContext';
-import Button from '../ui/Button';
+import Button from './Button';
 
 interface PrivacyConsentProps {
   onAgree: () => void;
@@ -14,13 +13,19 @@ export default function PrivacyConsent({
   title = "Privacy Protection Active",
   description = "Aapki privacy ke liye is screen ka screenshot lena mana hai. Order-Do anti-screenshot technology use karta hai."
 }: PrivacyConsentProps) {
-  const { t } = useLanguage();
+
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md">
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md"
+    >
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
         className="max-w-xs w-full bg-white dark:bg-slate-800 p-8 rounded-[2rem] shadow-2xl space-y-6 border border-slate-100 dark:border-slate-700 text-center"
       >
         <div className="w-20 h-20 bg-kirana-green/10 text-kirana-green rounded-full flex items-center justify-center mx-auto mb-2 border border-kirana-green/20">
@@ -43,14 +48,14 @@ export default function PrivacyConsent({
            </p>
         </div>
 
-        <Button onClick={onAgree} className="w-full h-14 bg-slate-800 hover:bg-slate-700 border-none transition-all active:scale-95 shadow-lg">
+        <Button onClick={onAgree} variant="primary" className="w-full h-14 border-none transition-all active:scale-95 shadow-lg shadow-kirana-green/20">
            Mera Consent Hai / I Agree
         </Button>
 
         <p className="text-[10px] uppercase font-black tracking-widest text-slate-400 opacity-50">
-           <EyeOff size={10} className="inline mr-1" /> Anti-Capture Protection v3.0
+           <EyeOff size={10} className="inline mr-1" /> Anti-Capture Protection v5.1.0
         </p>
       </motion.div>
-    </div>
+    </motion.div>
   );
 }

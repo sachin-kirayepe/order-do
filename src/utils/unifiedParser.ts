@@ -15,14 +15,14 @@ export function parseUnifiedTranscript(transcript: string): UnifiedOrder {
   
   // 1. Extract Name
   // Patterns: "Mera naam [Name] hai", "My name is [Name]", "I am [Name]", "Name is [Name]"
-  const nameMatch = normalized.match(/(?:mera naam|my name is|i am|name is|नाम है|नाम)\s+([^,.\saurौर]+)/i);
-  const name = nameMatch ? nameMatch[1].trim() : undefined;
+  const nameMatch = normalized.match(/(?:mera naam|my name is|i am|name is|नाम है|नाम)\s+([^,.\s]+)/i);
+  const name = nameMatch ? nameMatch[1].replace(/\b(aur|ौर)\b/g, '').trim() : undefined;
 
   // 2. Extract Address
   // Patterns: "Main [Addr] mein rehta hoon", "I live in [Addr]", "Address [Addr] hai", "Pata [Addr] hai"
-  const addressMatch = normalized.match(/(?:address|pata|rehta hoon|stay at|live in|पता hai|पता)\s+([^,.\saurौर]+)/i) 
+  const addressMatch = normalized.match(/(?:address|pata|rehta hoon|stay at|live in|पता hai|पता)\s+([^,.\s]+)/i) 
                   || normalized.match(/(?:main)\s+(.+)\s+(?:mein rehta hoon|me rehta hoon)/i);
-  const address = addressMatch ? addressMatch[1].trim() : undefined;
+  const address = addressMatch ? addressMatch[1].replace(/\b(aur|ौर)\b/g, '').trim() : undefined;
 
   // 3. Extract Items 
   // We look for everything after "order", "chahiye", "items", or just the remainder
