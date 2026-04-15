@@ -14,7 +14,8 @@ import {
   Clock,
   LayoutDashboard,
   Activity as ActivityIcon,
-  Globe
+  Globe,
+  HelpCircle
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -26,9 +27,9 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useLanguage } from '../../context/LanguageContext';
 import GlassCard from '../../components/ui/GlassCard';
 import Button from '../../components/ui/Button';
+import AdminTutorial from '../../components/admin/AdminTutorial';
 
 interface Activity {
   id: string;
@@ -39,7 +40,6 @@ interface Activity {
 }
 
 export default function AdminDashboard() {
-  useLanguage();
   const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalShops: 0,
@@ -53,6 +53,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [networkPressure, setNetworkPressure] = useState(15);
   const [activityNodes, setActivityNodes] = useState<number[]>([]);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -252,10 +253,20 @@ export default function AdminDashboard() {
         </div>
         
         <div className="flex items-center gap-3">
-           <GlassCard className="px-5 py-2.5 flex items-center gap-2.5 border-brand-primary/20 bg-brand-primary/5">
-              <div className="w-2 h-2 rounded-full bg-brand-primary animate-ping" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-brand-primary">System Online</span>
-           </GlassCard>
+           <Button 
+            variant="ghost" 
+            onClick={() => setShowTutorial(true)}
+            className="gap-2 text-brand-primary border border-brand-primary/20 bg-brand-primary/5 hover:bg-brand-primary/10"
+           >
+             <HelpCircle size={16} />
+             <span className="hidden sm:inline">Guide</span>
+           </Button>
+           <div className="h-10 bg-white/10 dark:bg-slate-900/60 p-1.5 rounded-full flex items-center gap-3 border border-white/10">
+             <div className="flex items-center gap-2 px-3">
+               <Globe size={14} className="text-brand-primary" />
+               <span className="text-[10px] font-black uppercase tracking-widest">Global Ops</span>
+             </div>
+           </div>
         </div>
       </div>
 
@@ -605,7 +616,7 @@ export default function AdminDashboard() {
            </GlassCard>
         </div>
       </div>
+      <AdminTutorial isOpen={showTutorial} onClose={() => setShowTutorial(false)} />
     </div>
   );
 }
-

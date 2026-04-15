@@ -257,6 +257,38 @@ export const translations = {
           description: "अपने हिसाब-किताब के लिए रोज़ाना या महीने की PDF रिपोर्ट डाउनलोड करें।"
         }
       ]
+    },
+    admin_tutorial: {
+      title: 'एडमिन मास्टरी गाइड',
+      gotIt: 'समझ गया!',
+      back: 'पीछे',
+      next: 'आगे',
+      steps: [
+        {
+          title: "स्टेप 1: एडमिन लॉगिन",
+          description: "अपने ईमेल और 6-अंकों के सीक्रेट PIN के साथ सुरक्षित लॉगिन करें।"
+        },
+        {
+          title: "स्टेप 2: शॉप्स ओवरव्यू",
+          description: "नेटवर्क की सभी दुकानों और उनकी स्थिति पर नज़र रखें।"
+        },
+        {
+          title: "स्टेप 3: पेमेंट कंट्रोल",
+          description: "पेंडिंग पेमेंट्स को वेरिफाई करें और तुरंत सब्सक्रिप्शन एक्टिवेट करें।"
+        },
+        {
+          title: "स्टेप 4: प्लान मैनेजमेंट",
+          description: "Free, Plus और Premium प्लांस के फीचर्स को यहीं से कंट्रोल करें।"
+        },
+        {
+          title: "स्टेप 5: शॉप्स को स्केल करें",
+          description: "किसी भी दुकान का प्लान उनकी ज़रूरत के हिसाब से कभी भी बदलें।"
+        },
+        {
+          title: "स्टेप 6: ग्लोबल सिक्योरिटी",
+          description: "एक्टिव सेशन्स और डिवाइसेस की सुरक्षा की पूरी निगरानी रखें।"
+        }
+      ]
     }
   },
   en: {
@@ -514,6 +546,38 @@ export const translations = {
         {
           title: "Step 8: Sales Reports",
           description: "Download daily or monthly PDF reports for your accounting."
+        }
+      ]
+    },
+    admin_tutorial: {
+      title: 'Admin Mastery Guide',
+      gotIt: 'Got it!',
+      back: 'Back',
+      next: 'Next',
+      steps: [
+        {
+          title: "Step 1: Admin Login",
+          description: "Secure access with your admin email and a secret 6-digit PIN."
+        },
+        {
+          title: "Step 2: Shops Overview",
+          description: "Monitor the entire network of registered shops and their health."
+        },
+        {
+          title: "Step 3: Payment Control",
+          description: "Verify pending payments and activate shop subscriptions instantly."
+        },
+        {
+          title: "Step 4: Plan Management",
+          description: "Orchestrate features for Free, Plus, and Premium tiers globally."
+        },
+        {
+          title: "Step 5: Scaling Shops",
+          description: "Dynamically upgrade or downgrade shop plans as per requirements."
+        },
+        {
+          title: "Step 6: Global Security",
+          description: "Oversee active sessions and manage multi-device access security."
         }
       ]
     }
