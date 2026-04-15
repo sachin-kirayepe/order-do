@@ -25,6 +25,8 @@ import Button from '../../components/ui/Button';
 import GlassCard from '../../components/ui/GlassCard';
 import Input from '../../components/ui/Input';
 import { compressPhoto } from '../../utils/compress';
+import VisualTutorial from '../../components/customer/VisualTutorial';
+import { HelpCircle } from 'lucide-react';
 
 const SpeechRecognition =
   (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -79,6 +81,7 @@ export default function OrderFlow() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [orderSummary, setOrderSummary] = useState<any>(null);
   const [isMagicListening, setIsMagicListening] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   useEffect(() => {
     if (pincode.length === 6) {
@@ -428,6 +431,9 @@ return (
         </div>
 
         <div className="flex gap-2">
+          <Button variant="ghost" size="sm" className="!p-0 w-10 h-10 rounded-full text-brand-primary" onClick={() => setShowTutorial(true)}>
+            <HelpCircle size={18} />
+          </Button>
           <Button variant="ghost" size="sm" className="!p-0 w-10 h-10 rounded-full" onClick={toggleTheme}>
             {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
           </Button>
@@ -599,6 +605,10 @@ return (
       feedbackEnabled={shopFeatures.magic_feedback}
     />}
     {submitted && <Confetti />}
+    <VisualTutorial 
+      isOpen={showTutorial}
+      onClose={() => setShowTutorial(false)}
+    />
   </div>
 );
 }
