@@ -47,6 +47,8 @@ import { useLanguage } from '../../context/LanguageContext';
 import LanguageSwitcher from '../../components/ui/LanguageSwitcher';
 import AdBanner from '../../components/ui/AdBanner';
 import SessionManager from '../../components/settings/SessionManager';
+import ShopTutorial from '../../components/shopkeeper/ShopTutorial';
+import { HelpCircle } from 'lucide-react';
 
 const SpeechRecognition =
   (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -68,6 +70,7 @@ export default function Dashboard() {
 
   // Assistant
   const [isAssistantListening, setIsAssistantListening] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   const handleAssistantVoice = () => {
     if (!SpeechRecognition) {
@@ -842,6 +845,9 @@ export default function Dashboard() {
                   <Button variant="ghost" size="sm" className="!p-0 w-10 h-10 rounded-xl" onClick={() => { setAutoAnnounce(!autoAnnounce); haptics.light(); }}>
                      {autoAnnounce ? <Bell size={18} className="text-brand-primary" /> : <BellOff size={18} className="text-slate-400" />}
                   </Button>
+                  <Button variant="ghost" size="sm" className="!p-0 w-10 h-10 rounded-xl text-brand-primary" onClick={() => setShowTutorial(true)}>
+                     <HelpCircle size={18} />
+                  </Button>
                   <LanguageSwitcher />
                   <Button variant="ghost" size="sm" className="!p-0 w-10 h-10 rounded-xl" onClick={toggleTheme}>
                      {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
@@ -1420,6 +1426,7 @@ export default function Dashboard() {
             <span className="font-bold text-sm tracking-tight">{isAssistantListening ? '...' : 'Chhotididi'}</span>
           </motion.button>
         </div>
+        <ShopTutorial isOpen={showTutorial} onClose={() => setShowTutorial(false)} />
       </div>
     </PullToRefresh>
   );

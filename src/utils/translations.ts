@@ -216,6 +216,47 @@ export const translations = {
       counter: 'काउंटर',
       noOrders: 'कोई लंबित ऑर्डर नहीं',
       instruction: 'विशेष निर्देश',
+    },
+    tutorial: {
+      shopTitle: 'दुकानदार गाइड',
+      howToOrder: 'ऑर्डर-डू इस्तेमाल कैसे करें?',
+      gotIt: 'समझ गया!',
+      back: 'पीछे',
+      next: 'आगे',
+      steps: [
+        {
+          title: "स्टेप 1: स्वागत है!",
+          description: "लॉगिन करें और अपनी प्रोफ़ाइल सेट करें ताकि आपका डिजिटल सफर शुरू हो सके।"
+        },
+        {
+          title: "स्टेप 2: प्रोफ़ाइल सेटअप",
+          description: "दुकान का नाम, पता और UPI आईडी जैसी जानकारी पूरी भरें।"
+        },
+        {
+          title: "स्टेप 3: मास्टर QR कोड",
+          description: "बड़े ऑर्डर के लिए अपनी दुकान का परमानेंट मास्टर QR कोड बनाएं और प्रिंट करें।"
+        },
+        {
+          title: "स्टेप 4: काउंटर QR कोड",
+          description: "अपनी दुकान के हर काउंटर या टेबल के लिए अलग QR कोड बनाएं।"
+        },
+        {
+          title: "स्टेप 5: वॉयस अलर्ट",
+          description: "नया ऑर्डर आते ही रीयल-टाइम आवाज़ सुनें और अपडेट रहें।"
+        },
+        {
+          title: "स्टेप 6: ऑर्डर मैनेजमेंट",
+          description: "ऑर्डर स्वीकार करें, तैयार करें और रसीद के साथ पूरा करें।"
+        },
+        {
+          title: "स्टेप 7: प्लान की स्थिति",
+          description: "सेटिंग्स में अपना सब्सक्रिप्शन और बचे हुए दिनों को चेक करते रहें।"
+        },
+        {
+          title: "स्टेप 8: सेल्स रिपोर्ट्स",
+          description: "अपने हिसाब-किताब के लिए रोज़ाना या महीने की PDF रिपोर्ट डाउनलोड करें।"
+        }
+      ]
     }
   },
   en: {
@@ -434,6 +475,47 @@ export const translations = {
       counter: 'Counter',
       noOrders: 'No pending orders',
       instruction: 'Special Info',
+    },
+    tutorial: {
+      shopTitle: 'Dukandar Guide',
+      howToOrder: 'How to use Order-Do?',
+      gotIt: 'Got it!',
+      back: 'Back',
+      next: 'Next',
+      steps: [
+        {
+          title: "Step 1: Welcome!",
+          description: "Login and setup your profile to start your digital journey."
+        },
+        {
+          title: "Step 2: Profile Setup",
+          description: "Complete your shop details like name, address and UPI ID."
+        },
+        {
+          title: "Step 3: Master QR",
+          description: "Generate and print your Master QR code for general orders."
+        },
+        {
+          title: "Step 4: Counter QRs",
+          description: "Create specific QR codes for each counter or table in your shop."
+        },
+        {
+          title: "Step 5: Voice Alerts",
+          description: "Listen to real-time voice notifications when a new order arrives."
+        },
+        {
+          title: "Step 6: Manage Orders",
+          description: "Accept, prepare, and complete orders with digital receipts."
+        },
+        {
+          title: "Step 7: Plan Status",
+          description: "Check your subscription and remaining days in settings."
+        },
+        {
+          title: "Step 8: Sales Reports",
+          description: "Download daily or monthly PDF reports for your accounting."
+        }
+      ]
     }
   },
 };
