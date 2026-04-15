@@ -32,11 +32,28 @@ export default function TalkingCharacter() {
   const { isVisible, isMuted, toggleMute, isSpeaking, stop, repeat, currentText, action } = useTalkingCharacter();
   const [minimized, setMinimized] = useState(false);
   const [hasCanvasError, setHasCanvasError] = useState(false);
+  const [isLoadingModel, setIsLoadingModel] = useState(!hasCanvasError);
 
   // Auto-show logic
   useEffect(() => {
     if (isSpeaking) setMinimized(false);
   }, [isSpeaking]);
+
+  // Robust loading timeout for the 3D model
+  useEffect(() => {
+    if (!isVisible && !isSpeaking) return;
+    
+    setIsLoadingModel(true);
+    const timeout = setTimeout(() => {
+        if (isLoadingModel) {
+            console.warn('[TalkingCharacter] Model loading timeout - using fallback');
+            setHasCanvasError(true);
+            setIsLoadingModel(false);
+        }
+    }, 12000); // 12 second graceful timeout for Indian networks
+
+    return () => clearTimeout(timeout);
+  }, [isVisible, isSpeaking, isLoadingModel]);
 
   if (!isVisible && !isSpeaking) return null;
 

@@ -93,8 +93,7 @@ export default function SessionGuard({ children }: SessionGuardProps) {
     };
 
     checkSession();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authLoading, subLoading, subscription, isAdmin]);
+  }, [user, authLoading, subLoading, subscription, isAdmin, deviceId, deviceName]);
 
   if (loading || authLoading || subLoading) {
     return (

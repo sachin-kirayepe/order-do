@@ -126,6 +126,14 @@ export default function Dashboard() {
   const [isGeneratingMultiQR, setIsGeneratingMultiQR] = useState(false);
   const { isBlocked, isPenaltyActive, strikeCount } = useAntiCapture(tab === 'orders' || tab === 'history');
 
+  const fetchAnnouncements = useCallback(async () => {
+    const { data } = await supabase
+      .from('announcements')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (data) setAnnouncements(data);
+  }, []);
+
   useEffect(() => {
     fetchAnnouncements();
     const annSub = supabase.channel('announcements')
@@ -153,15 +161,7 @@ export default function Dashboard() {
       supabase.removeChannel(annSub); 
       supabase.removeChannel(profileSub); 
     };
-  }, [user?.id, language]);
-
-  const fetchAnnouncements = async () => {
-    const { data } = await supabase
-      .from('announcements')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (data) setAnnouncements(data);
-  };
+  }, [user?.id, language, fetchAnnouncements]);
 
   const handleSupport = () => {
     window.open('https://wa.me/917349141040?text=Hello%20Order-Do%20Support!', '_blank');
@@ -291,8 +291,7 @@ export default function Dashboard() {
       setLoading(false);
     };
     load();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, navigate, language]);
+  }, [user, navigate, language, t, speak]);
 
   // Refresh
   const refreshOrders = useCallback(async () => {
@@ -339,8 +338,7 @@ export default function Dashboard() {
     })));
 
     setHistory(decryptedH as any[]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, autoAnnounce, playNotification, t, language, speak]);
+  }, [profile, autoAnnounce, playNotification, language, announceOrder]);
 
   const filteredHistory = useMemo(() => {
     return history.filter((h: any) => {

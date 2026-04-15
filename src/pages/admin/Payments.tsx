@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { 
@@ -58,7 +58,7 @@ export default function AdminPayments() {
   });
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const fetchPayments = async () => {
+  const fetchPayments = useCallback(async () => {
     setLoading(true);
     try {
       if (activeTab === 'history') {
@@ -109,7 +109,7 @@ export default function AdminPayments() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab]);
 
   useEffect(() => {
     fetchPayments();
@@ -121,8 +121,7 @@ export default function AdminPayments() {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
+  }, [fetchPayments]);
 
   const openConfirmModal = (payment: PendingPayment) => {
     setConfirmingPayment(payment);

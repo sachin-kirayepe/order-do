@@ -4,7 +4,6 @@ import { supabase } from '../../lib/supabase';
 import { 
   Plus, 
   Trash2, 
-  Edit3, 
   CheckCircle2, 
   XCircle, 
   Settings2,
@@ -15,6 +14,7 @@ import {
   Sparkles,
   Zap,
   ShieldCheck,
+  X,
   CreditCard
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
@@ -32,28 +32,35 @@ interface Plan {
   is_active: boolean;
 }
 
+const INITIAL_FEATURES = {
+  dynamic_qr: true,
+  voice_announcements: true,
+  magic_feedback: false,
+  multi_device: false,
+  advanced_analytics: false,
+  loyalty_program: false,
+  custom_branding: false,
+  priority_support: false
+};
+
+const INITIAL_PLAN_STATE = {
+  name: '',
+  description: '',
+  monthly_price: 0,
+  yearly_price: 0,
+  features: { ...INITIAL_FEATURES },
+  is_active: true
+};
+
 export default function AdminPlans() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [currentPlan, setCurrentPlan] = useState<Partial<Plan>>({
-    name: '',
-    description: '',
-    monthly_price: 0,
-    yearly_price: 0,
-    features: {
-      qr_limit_unlimited: false, kds: false, reports: false, upi: false,
-      analytics: false, menu_management: false, voice_assistant: false,
-      whatsapp_alerts: false, inventory_management: false, thermal_printing: false,
-      customer_database: false, priority_support: false, regional_languages: false,
-      custom_branding: false, staff_accounts: false, multi_terminal: false,
-      smart_inventory: false, magic_feedback: false, order_speedometer: false,
-      max_devices: 1
-    },
-    is_active: true
-  });
+  const [currentPlan, setCurrentPlan] = useState<Partial<Plan>>(INITIAL_PLAN_STATE);
 
   const fetchPlans = async (silent = false) => {
     try {
@@ -87,6 +94,7 @@ export default function AdminPlans() {
 
   const handleSave = async () => {
     try {
+      setIsSaving(true);
       const savePayload: any = {
         name: currentPlan.name || 'Unnamed Plan',
         features: currentPlan.features || {},
@@ -129,6 +137,8 @@ export default function AdminPlans() {
     } catch (err: any) {
       console.error('Save plan error:', err);
       toast.error(`Operation failed: ${err?.message}`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -182,11 +192,14 @@ export default function AdminPlans() {
     }
   };
 
+  const handleDeleteClick = (id: number) => {
+    setDeleteConfirmId(id);
+  };
+
   const deletePlanPermanently = async (id: number) => {
-    if (!confirm('EXTERMINATE: This tiers data will be purged. Continue?')) return;
-    
     const backup = plans;
     setPlans(prev => prev.filter(p => p.id !== id));
+    setDeleteConfirmId(null);
     
     const { error } = await supabase.from('plans').delete().eq('id', id);
     if (error) {
@@ -198,6 +211,11 @@ export default function AdminPlans() {
         setCurrentIndex(Math.max(0, backup.length - 2));
       }
     }
+  };
+
+  const handleEdit = (plan: Plan) => {
+    setCurrentPlan(plan);
+    setIsEditing(true);
   };
 
   if (loading) return (
@@ -236,19 +254,7 @@ export default function AdminPlans() {
         {!isEditing && (
           <Button onClick={() => { 
             setIsEditing(true); 
-            setCurrentPlan({
-               name: '', description: '', monthly_price: 0, yearly_price: 0,
-               features: {
-                 qr_limit_unlimited: false, kds: false, reports: false, upi: false,
-                 analytics: false, menu_management: false, voice_assistant: false,
-                 whatsapp_alerts: false, inventory_management: false, thermal_printing: false,
-                 customer_database: false, priority_support: false, regional_languages: false,
-                 custom_branding: false, staff_accounts: false, multi_terminal: false,
-                 smart_inventory: false, magic_feedback: false, order_speedometer: false,
-                 max_devices: 1
-               },
-               is_active: true
-            }); 
+            setCurrentPlan(INITIAL_PLAN_STATE); 
           }} className="h-14 px-8 !rounded-2xl shadow-glow-green" variant="primary">
             <Plus size={20} className="mr-2" /> 
             Generate New Tier
@@ -321,8 +327,8 @@ export default function AdminPlans() {
                <Button variant="ghost" onClick={() => setIsEditing(false)} className="flex-1 h-14 !rounded-2xl font-black uppercase tracking-widest text-slate-500">
                   Abort Editing
                </Button>
-               <Button onClick={handleSave} className="flex-2 h-14 !rounded-2xl shadow-glow-green" variant="primary">
-                  Commit To Network Tier ✓
+               <Button onClick={handleSave} disabled={isSaving} className="flex-2 h-14 !rounded-2xl shadow-glow-green" variant="primary">
+                  {isSaving ? 'Committing...' : 'Commit To Network Tier ✓'}
                </Button>
             </div>
           </GlassCard>
@@ -377,22 +383,14 @@ export default function AdminPlans() {
                       rotateY: offset * -20
                     }}
                     transition={{ type: "spring", stiffness: 500, damping: 40, mass: 0.8 }}
-                    drag="x"
-                    dragConstraints={{ left: 0, right: 0 }}
-                    dragElastic={0.1}
-                    onDragEnd={(_, { offset, velocity }) => {
-                      const swipe = Math.abs(offset.x) * velocity.x;
-                      if (swipe < -500) setCurrentIndex(prev => Math.min(plans.length - 1, prev + 1));
-                      else if (swipe > 500) setCurrentIndex(prev => Math.max(0, prev - 1));
-                    }}
                     className="absolute w-full max-w-[340px] md:max-w-[400px]"
                   >
                      <GlassCard 
                         intensity={isActive ? "high" : "low"} 
                         className={`p-10 border-2 transition-all duration-500 flex flex-col h-[36rem] overflow-hidden relative ${
                           isActive 
-                            ? 'shadow-glow-green/20 border-brand-primary/30 cursor-grab active:cursor-grabbing border-b-8' 
-                            : 'cursor-pointer hover:border-white/40 border-white/10 dark:border-white/5 opacity-60'
+                            ? 'shadow-glow-green/20 border-brand-primary/30 border-b-8' 
+                            : 'border-white/10 dark:border-white/5 opacity-60'
                         } ${!plan.is_active ? 'grayscale opacity-40' : ''}`}
                      >
                         {!plan.is_active && (
@@ -405,9 +403,13 @@ export default function AdminPlans() {
                            <div className="flex-1 min-w-0">
                              <div className="flex items-center gap-2 mb-1">
                                 <Sparkles size={14} className="text-brand-primary" />
-                                <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter italic truncate">{plan.name}</h3>
+                                <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase italic tracking-tight break-words line-clamp-2">
+                                  {plan.name}
+                                </h3>
                              </div>
-                             <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] truncate">{plan.description}</p>
+                             <p className="text-sm text-slate-500 font-medium mt-1 leading-relaxed">
+                               {plan.description}
+                             </p>
                            </div>
                            
                            <AnimatePresence>
@@ -416,26 +418,10 @@ export default function AdminPlans() {
                                    <Button 
                                      variant="ghost"
                                      size="sm"
-                                     onClick={(e) => { e.stopPropagation(); setIsEditing(true); setCurrentPlan(plan); }} 
-                                     className="w-10 h-10 !p-0 bg-brand-secondary/10 text-brand-secondary rounded-xl hover:scale-110 active:scale-95 transition-all border border-brand-secondary/10"
-                                   >
-                                     <Edit3 size={16} />
-                                   </Button>
-                                   <Button 
-                                     variant="ghost"
-                                     size="sm"
                                      onClick={(e) => { e.stopPropagation(); togglePlanStatus(plan); }} 
                                      className={`w-10 h-10 !p-0 rounded-xl hover:scale-110 active:scale-95 transition-all border ${plan.is_active ? 'bg-amber-500/10 text-amber-500 border-amber-500/10' : 'bg-brand-primary/10 text-brand-primary border-brand-primary/10'}`}
                                    >
                                      {plan.is_active ? <EyeOff size={16} /> : <Eye size={16} />}
-                                   </Button>
-                                   <Button 
-                                     variant="ghost"
-                                     size="sm"
-                                     onClick={(e) => { e.stopPropagation(); deletePlanPermanently(plan.id); }} 
-                                     className="w-10 h-10 !p-0 bg-red-500/10 text-red-500 rounded-xl hover:scale-110 active:scale-95 transition-all border border-red-500/10"
-                                   >
-                                     <Trash2 size={16} />
                                    </Button>
                                 </motion.div>
                               )}
@@ -443,14 +429,14 @@ export default function AdminPlans() {
                         </div>
 
                         <div className="flex gap-5 mb-10">
-                           <div className="flex-1 min-w-0 bg-white/40 dark:bg-slate-950/40 backdrop-blur-md p-5 rounded-[2rem] text-center border border-white/40 dark:border-white/5 group-hover:scale-105 transition-transform overflow-hidden">
+                           <div className="flex-1 min-w-0 bg-white/40 dark:bg-slate-950/40 backdrop-blur-md p-5 rounded-[2rem] text-center border border-white/40 dark:border-white/5">
                               <div className="flex items-center justify-center gap-1.5 mb-1.5 opacity-60">
                                  <CreditCard size={10} className="text-slate-400 shrink-0" />
                                  <p className="text-[9px] font-black text-slate-800 dark:text-white uppercase tracking-widest truncate">Monthly</p>
                               </div>
                               <p className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 dark:text-white italic tracking-tighter truncate leading-none">₹{plan.monthly_price || 0}</p>
                            </div>
-                           <div className="flex-1 min-w-0 bg-brand-primary/10 p-5 rounded-[2rem] text-center border border-brand-primary/30 shadow-glow-green/10 group-hover:scale-105 transition-transform overflow-hidden">
+                           <div className="flex-1 min-w-0 bg-brand-primary/10 p-5 rounded-[2rem] text-center border border-brand-primary/30 shadow-glow-green/10">
                               <div className="flex items-center justify-center gap-1.5 mb-1.5">
                                  <Zap size={10} className="text-brand-primary shrink-0" />
                                  <p className="text-[9px] font-black text-brand-primary uppercase tracking-widest truncate">Yearly</p>
@@ -477,6 +463,42 @@ export default function AdminPlans() {
                                 )}
                              </div>
                            ))}
+                        </div>
+
+                        <div className="flex gap-3 pt-6 border-t border-white/10 mt-auto">
+                          <Button 
+                            variant="ghost" 
+                            className="flex-1 h-12 !rounded-xl text-[10px] font-black uppercase tracking-widest"
+                            onClick={() => handleEdit(plan)}
+                          >
+                            Configure
+                          </Button>
+                          {deleteConfirmId === plan.id ? (
+                            <div className="flex-1 flex gap-2">
+                              <Button 
+                                variant="primary" 
+                                className="flex-1 h-12 !rounded-xl bg-red-500 hover:bg-red-600 text-[10px] font-black uppercase"
+                                onClick={() => deletePlanPermanently(plan.id)}
+                              >
+                                Confirm?
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                className="w-12 h-12 !p-0 !rounded-xl"
+                                onClick={() => setDeleteConfirmId(null)}
+                              >
+                                <X size={16} />
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button 
+                              variant="ghost" 
+                              className="w-12 h-12 !p-0 !rounded-xl text-red-500/50 hover:text-red-500 hover:bg-red-500/10"
+                              onClick={() => handleDeleteClick(plan.id)}
+                            >
+                              <Trash2 size={18} />
+                            </Button>
+                          )}
                         </div>
                      </GlassCard>
                   </motion.div>

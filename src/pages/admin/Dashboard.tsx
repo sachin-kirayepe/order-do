@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { 
@@ -54,7 +54,7 @@ export default function AdminDashboard() {
   const [networkPressure, setNetworkPressure] = useState(15);
   const [activityNodes, setActivityNodes] = useState<number[]>([]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const [shopsRes, subsRes, paymentsRes, confirmedRes] = await Promise.all([
         supabase.from('shops_profile').select('*', { count: 'exact', head: true }),
@@ -150,7 +150,7 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Generate random activity nodes for the heatmap
   useEffect(() => {
@@ -176,11 +176,10 @@ export default function AdminDashboard() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payment_history' }, () => fetchStats())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pending_orders' }, () => fetchStats())
       .subscribe();
-
     return () => {
       supabase.removeChannel(channels);
     };
-  }, []);
+  }, [fetchStats]);
 
   const AnimatedNumber = ({ value, prefix = '' }: { value: number | string, prefix?: string }) => {
     const [displayValue, setDisplayValue] = useState(0);
@@ -206,8 +205,7 @@ export default function AdminDashboard() {
       };
 
       requestAnimationFrame(update);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [numericValue]);
+    }, [numericValue, displayValue]);
 
     return <span>{prefix}{displayValue.toLocaleString()}</span>;
   };

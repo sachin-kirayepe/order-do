@@ -58,8 +58,84 @@ export default function AdminShops() {
   const [plans, setPlans] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [displayLimit, setDisplayLimit] = useState(20);
-  
+  const [totalShops, setTotalShops] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
+
+  const fetchShopsAndPlans = useCallback(async (page: number = 0) => {
+    try {
+      setLoading(true);
+      const start = page * 20;
+      const end = start + 19;
+
+      // 1. Get Count
+      const { count } = await supabase.from('shops_profile').select('*', { count: 'exact', head: true });
+      if (count !== null) setTotalShops(count);
+
+      // 2. Get Paginated Shops
+      const { data: shopsBase, error: shopsErr } = await supabase
+        .from('shops_profile')
+        .select(`
+          *,
+          subscriptions (
+            status,
+            expiry_date,
+            plan_id,
+            is_auto_mode,
+            last_manual_override_at,
+            plans (name)
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .range(start, end);
+      
+      if (shopsErr) throw shopsErr;
+      
+      // 3. Map nested data
+      const shopsWithSubs = (shopsBase || []).map(shop => ({
+        ...shop,
+        subscription: (shop.subscriptions as any)?.[0] ? {
+           ...(shop.subscriptions as any)[0],
+           plan: (shop.subscriptions as any)[0].plans
+        } : undefined
+      }));
+
+      // 4. Fetch history for visible shops
+      const shopIds = shopsWithSubs.map(s => s.id);
+      const { data: latestHistory } = await supabase
+        .from('payment_history')
+        .select('shop_id, confirmed_at')
+        .in('shop_id', shopIds)
+        .order('confirmed_at', { ascending: false });
+
+      const finalShops = shopsWithSubs.map(shop => {
+        const lastConfirmation = (latestHistory || []).find(h => h.shop_id === shop.id);
+        return {
+          ...shop,
+          subscription: shop.subscription ? {
+            ...shop.subscription,
+            confirmed_at: lastConfirmation?.confirmed_at
+          } : undefined
+        };
+      });
+
+      if (page === 0) setShops(finalShops as any[]);
+      else setShops(prev => [...prev, ...finalShops as any[]]);
+      setCurrentPage(page);
+
+      // Fetch plans once if not already loaded
+      if (plans.length === 0) {
+        const { data: plansData } = await supabase.from('plans').select('id, name').order('id', { ascending: true });
+        if (plansData) setPlans(plansData);
+      }
+
+    } catch (err: any) {
+      console.error('Fetch Error:', err);
+      toast.error(`Sync Error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [plans.length]);
+
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
   const [viewTab, setViewTab] = useState<'info' | 'history'>('info');
   const [shopPayments, setShopPayments] = useState<PaymentRecord[]>([]);
@@ -72,47 +148,8 @@ export default function AdminShops() {
   });
   const [isSaving, setIsSaving] = useState(false);
 
-  const fetchShopsAndPlans = async () => {
-    try {
-      const [shopsRes, subsRes, plansRes, historyRes] = await Promise.all([
-        supabase.from('shops_profile').select('*'),
-        supabase.from('subscriptions').select('*, plans(name)'),
-        supabase.from('plans').select('id, name').order('id', { ascending: true }),
-        supabase.from('payment_history').select('shop_id, confirmed_at').order('confirmed_at', { ascending: false })
-      ]);
-      
-      if (shopsRes.error) throw shopsRes.error;
-      
-      const shopsData = (shopsRes.data || []).map(shop => {
-        const sub = (subsRes.data || []).find(s => s.shop_id === shop.id);
-        const lastConfirmation = (historyRes.data || []).find(h => h.shop_id === shop.id);
-        
-        return {
-          ...shop,
-          subscription: sub ? {
-            status: sub.status,
-            expiry_date: sub.expiry_date,
-            plan_id: sub.plan_id,
-            plan: sub.plans,
-            confirmed_at: lastConfirmation?.confirmed_at,
-            is_auto_mode: sub.is_auto_mode !== false,
-            last_manual_override_at: sub.last_manual_override_at
-          } : undefined
-        };
-      });
-
-      setShops(shopsData as any[]);
-      if (plansRes.data) setPlans(plansRes.data);
-    } catch (err: any) {
-      console.error('Fetch Error:', err);
-      toast.error(`Sync Error: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchShopsAndPlans();
+    fetchShopsAndPlans(0);
 
     const channel = supabase.channel('admin-shops-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => fetchShopsAndPlans())
@@ -121,7 +158,7 @@ export default function AdminShops() {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [fetchShopsAndPlans]);
 
   const openShopDetail = async (shop: Shop) => {
     setSelectedShop(shop);
@@ -246,8 +283,8 @@ export default function AdminShops() {
     s.phone.includes(search)
   );
 
-  const paginatedShops = filteredShops.slice(0, displayLimit);
-  const hasMore = filteredShops.length > displayLimit;
+  const paginatedShops = filteredShops; // Already filtered and paginated via fetch
+  const hasMore = shops.length < totalShops;
 
   return (
     <div className="space-y-10 pb-10">
@@ -372,7 +409,7 @@ export default function AdminShops() {
             <div className="flex justify-center pt-8">
               <Button 
                 variant="ghost"
-                onClick={() => setDisplayLimit(prev => prev + 20)}
+                onClick={() => fetchShopsAndPlans(currentPage + 1)}
                 className="px-10 py-4 bg-white/20 dark:bg-slate-900/20 border border-white/20 rounded-2xl text-[10px] font-black uppercase tracking-widest"
               >
                 Load Next Batch <Download size={14} className="ml-2" />

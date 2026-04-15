@@ -24,6 +24,7 @@ import { useVoice } from '../../context/VoiceContext';
 import Button from '../../components/ui/Button';
 import GlassCard from '../../components/ui/GlassCard';
 import Input from '../../components/ui/Input';
+import { compressPhoto } from '../../utils/compress';
 
 const SpeechRecognition =
   (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -208,11 +209,16 @@ export default function OrderFlow() {
   };
 
   const handleSubmitOrder = async (paymentStatus: 'cod' | 'upi') => {
+    if (submitting) return; // TC-031 FIX: Prevent concurrent submission (Double-click protection)
     setSubmitting(true);
     try {
-      // TC-030 FIX: Use a unified short ID for both customer and shopkeeper
-      const shortId = `ORD-${Math.random().toString(36).toUpperCase().slice(2, 6)}`;
+      // TC-030 FIX: Use a more unique short ID (Timestamp + Random)
+      const collisionGuard = Date.now().toString(36).toUpperCase().slice(-3);
+      const shortId = `ORD-${collisionGuard}${Math.random().toString(36).toUpperCase().slice(2, 5)}`;
       const orderId = `order-${crypto.randomUUID()}`;
+
+      // Compress photo before upload to save bandwidth and DB space
+      const optimizedPhoto = photo ? await compressPhoto(photo, 100 * 1024) : '';
 
       // Prepare encrypted strings (Async)
       const encryptedName = await encrypt(customerName, shopId);
@@ -228,7 +234,7 @@ export default function OrderFlow() {
         customer_name: encryptedName,
         customer_address: encryptedAddress,
         customer_phone: encryptedPhone,
-        photo_data_url: photo, // Temporary sync for visibility
+        photo_data_url: optimizedPhoto, // Optimized sync for visibility
         short_id: shortId, // NEW: Human readable ID for both sides
         items,
         status: 'pending',
@@ -252,7 +258,7 @@ export default function OrderFlow() {
         customerName: encryptedName,
         customerAddress: encryptedAddress,
         customerPhone: encryptedPhone || '',
-        photoDataUrl: photo, 
+        photoDataUrl: optimizedPhoto, 
         short_id: shortId, // Store locally too
         items,
         createdAt: Date.now(),
@@ -312,12 +318,16 @@ useEffect(() => {
           setPrevStatus(newStatus);
         }
       } else if (payload.eventType === 'DELETE') {
-        // Order was completed or rejected (removed from cloud)
-        setLiveStatus('completed');
-        if (prevStatus !== 'completed') {
+        // Order was completed or removed from cloud.
+        // If it wasn't already accepted/ready, it might have been rejected.
+        if (prevStatus === 'pending') {
+          setLiveStatus('rejected');
+          speak(language === 'hi' ? 'Order asveekaar kar diya gaya hai.' : 'Order has been rejected by the shop.');
+        } else {
+          setLiveStatus('completed');
           speak(v => v.ORDER_COMPLETED_CUSTOMER);
-          setPrevStatus('completed');
         }
+        setPrevStatus('completed');
       }
     })
     .subscribe();
@@ -325,7 +335,7 @@ useEffect(() => {
   return () => {
     supabase.removeChannel(channel);
   };
-}, [trackedOrderId, prevStatus, speak]);
+}, [trackedOrderId, prevStatus, speak, language]);
 
 const handleShareReceipt = async () => {
   if (!orderSummary) return;
