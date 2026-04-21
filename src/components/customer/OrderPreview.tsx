@@ -17,16 +17,24 @@ interface OrderPreviewProps {
   shopId: string;
   shopName: string;
   upiId?: string;
-  onSubmit: (paymentStatus: 'cod' | 'upi') => void;
+  onSubmit: (paymentStatus: 'cod' | 'upi', utr?: string) => void;
   submitting: boolean;
   submitted: boolean;
+  disableCOD?: boolean;
 }
 
 export default function OrderPreview({
-  photo, customerName, customerAddress, items, shopName, upiId, onSubmit, submitting, submitted,
+  photo, customerName, customerAddress, items, shopName, upiId, onSubmit, submitting, submitted, disableCOD
 }: OrderPreviewProps) {
-  const { t } = useLanguage();
-  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'upi'>('cod');
+  const { t, language } = useLanguage();
+  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'upi'>(disableCOD ? 'upi' : 'cod');
+  const [paymentUtr, setPaymentUtr] = useState('');
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
+  const captchaProblem = useMemo(() => {
+    const a = Math.floor(Math.random() * 9) + 1;
+    const b = Math.floor(Math.random() * 9) + 1;
+    return { a, b, result: a + b };
+  }, []);
   const { isBlocked } = useAntiCapture(!submitted);
 
   const { totalAmount, hasUnpricedItems } = useMemo(() => {
@@ -41,7 +49,7 @@ export default function OrderPreview({
     return { totalAmount: roundedTotal, hasUnpricedItems: missing };
   }, [items]);
 
-  const canSubmit = !!photo && !!customerName && !!customerAddress && items.length > 0;
+  const canSubmit = !!photo && !!customerName && !!customerAddress && items.length > 0 && parseInt(captchaAnswer) === captchaProblem.result;
 
 
   return (
@@ -148,17 +156,20 @@ export default function OrderPreview({
         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Payment Method</h3>
         <div className="grid grid-cols-2 gap-3">
           <button
-            onClick={() => setPaymentMethod('cod')}
+            onClick={() => !disableCOD && setPaymentMethod('cod')}
+            disabled={disableCOD}
             className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-300 ${
               paymentMethod === 'cod' 
                 ? 'border-kirana-green bg-kirana-green/10 shadow-lg shadow-kirana-green/5' 
                 : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800/50 text-slate-400 opacity-60'
-            }`}
+            } ${disableCOD ? 'cursor-not-allowed grayscale' : ''}`}
           >
             <div className={`p-2 rounded-xl ${paymentMethod === 'cod' ? 'bg-kirana-green text-white' : 'bg-slate-100 dark:bg-slate-700'}`}>
               <Banknote size={24} />
             </div>
-            <span className="text-xs font-black uppercase tracking-tighter italic">{t('customer.payCash')}</span>
+            <span className="text-xs font-black uppercase tracking-tighter italic">
+              {disableCOD ? 'COD Blocked' : t('customer.payCash')}
+            </span>
           </button>
 
           {upiId ? (
@@ -185,14 +196,64 @@ export default function OrderPreview({
 
         <AnimatePresence>
           {paymentMethod === 'upi' && upiId && totalAmount > 0 && (
-            <UPIQRCode upiId={upiId} shopName={shopName} amount={totalAmount} />
+            <div className="space-y-4">
+              <UPIQRCode upiId={upiId} shopName={shopName} amount={totalAmount} />
+              
+              <div className="bg-blue-50 dark:bg-blue-500/5 p-4 rounded-2xl border border-blue-200 dark:border-blue-500/20 space-y-3">
+                <p className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest flex items-center gap-2">
+                  <AlertCircle size={12} /> Verification Required
+                </p>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Enter 12-digit UTR / Ref No."
+                    value={paymentUtr}
+                    onChange={(e) => setPaymentUtr(e.target.value.replace(/[^0-9]/g, '').slice(0, 12))}
+                    className="w-full h-12 px-4 bg-white dark:bg-slate-950 border-2 border-blue-200 dark:border-blue-500/20 rounded-xl text-sm font-bold focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
+                  />
+                </div>
+                <p className="text-[9px] text-slate-500 font-medium leading-relaxed italic">
+                  Payment verification takes 10-30 seconds after entering UTR. Please do not close the app.
+                </p>
+              </div>
+            </div>
           )}
         </AnimatePresence>
+
+        {/* ANTI-SPAM: Math Captcha */}
+        {!submitted && (
+          <div className="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+             <div className="flex items-center justify-between">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Verify You Are Human</p>
+                <span className="text-xs font-black text-brand-primary bg-brand-primary/10 px-2 py-0.5 rounded-md">SPAM GUARD</span>
+             </div>
+             <div className="flex items-center gap-4">
+                <div className="flex-1 h-12 flex items-center justify-center bg-white dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-xl text-lg font-black tracking-widest italic">
+                  {captchaProblem.a} + {captchaProblem.b} = ?
+                </div>
+                <input 
+                  type="number"
+                  placeholder="Ans"
+                  value={captchaAnswer}
+                  onChange={(e) => setCaptchaAnswer(e.target.value)}
+                  className="w-24 h-12 bg-white dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-xl text-center text-lg font-black outline-none focus:border-brand-primary transition-all"
+                />
+             </div>
+          </div>
+        )}
+
+        {disableCOD && (
+          <div className="p-3 bg-red-500/10 rounded-xl border border-red-500/20">
+             <p className="text-[9px] font-black text-red-600 uppercase tracking-widest text-center italic">
+                {language === 'hi' ? 'Pichle galat vyavahar ke karan COD band hai.' : 'COD disabled due to previous policy violations.'}
+             </p>
+          </div>
+        )}
       </div>
 
       <Button
-        onClick={() => onSubmit(paymentMethod)}
-        disabled={!canSubmit}
+        onClick={() => onSubmit(paymentMethod, paymentUtr)}
+        disabled={!canSubmit || (paymentMethod === 'upi' && paymentUtr.length < 12)}
         isLoading={submitting}
         className="w-full py-4 text-lg font-black italic tracking-tighter uppercase"
       >

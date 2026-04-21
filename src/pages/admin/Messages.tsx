@@ -60,6 +60,13 @@ export default function AdminMessages() {
   useEffect(() => {
     fetchMessages();
     fetchAnnouncements();
+
+    const channel = supabase.channel('admin-messages-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contact_messages' }, () => fetchMessages())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => fetchAnnouncements())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const fetchMessages = async () => {

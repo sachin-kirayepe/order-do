@@ -21,7 +21,7 @@ import {
   Bell, BellOff, PackageOpen, IndianRupee,
   Sun, Moon, UtensilsCrossed, Plus, Trash2, Sparkles,
   TrendingUp, Lock, Shield, ShieldCheck, Settings, ShieldAlert,
-  Megaphone
+  Megaphone, Star
 } from 'lucide-react';
 import { isExpired, isExpiringSoon, getFormattedRemainingTime } from '../../utils/dateUtils';
 import VoiceSettings from '../../components/shopkeeper/VoiceSettings';
@@ -53,7 +53,7 @@ import { HelpCircle } from 'lucide-react';
 const SpeechRecognition =
   (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-type Tab = 'orders' | 'history' | 'qr' | 'report' | 'menu' | 'settings';
+type Tab = 'orders' | 'history' | 'qr' | 'report' | 'menu' | 'reviews' | 'settings';
 
 export default function Dashboard() {
   const { user, logout, isAdmin } = useAuth();
@@ -164,7 +164,7 @@ export default function Dashboard() {
       supabase.removeChannel(annSub); 
       supabase.removeChannel(profileSub); 
     };
-  }, [user?.id, language, fetchAnnouncements]);
+  }, [user?.id, language, fetchAnnouncements, profile?.id]);
 
   const handleSupport = () => {
     window.open('https://wa.me/917349141040?text=Hello%20Order-Do%20Support!', '_blank');
@@ -341,7 +341,7 @@ export default function Dashboard() {
     })));
 
     setHistory(decryptedH as any[]);
-  }, [profile, autoAnnounce, playNotification, language, announceOrder]);
+  }, [profile, autoAnnounce, playNotification, language, announceOrder, t]);
 
   const filteredHistory = useMemo(() => {
     return history.filter((h: any) => {
@@ -443,7 +443,6 @@ export default function Dashboard() {
       console.error(err);
       toast.error('Error adding item');
     } finally {
-      setIsMenuSaving(true);
       setTimeout(() => setIsMenuSaving(false), 2000); // 2 second debounce
     }
   };
@@ -890,8 +889,8 @@ export default function Dashboard() {
 
         <div className="sticky top-[81px] z-40 bg-white/20 dark:bg-slate-900/20 backdrop-blur-3xl px-6 py-2 border-b border-white/10">
            <nav className="flex gap-2 overflow-x-auto no-scrollbar max-w-2xl mx-auto">
-            {(['orders', 'history', 'menu', 'qr', 'report', 'settings'] as Tab[]).map((k) => {
-              const Icon = k === 'orders' ? ListOrdered : k === 'history' ? History : k === 'menu' ? UtensilsCrossed : k === 'qr' ? QrCode : k === 'settings' ? Settings : TrendingUp;
+            {(['orders', 'history', 'menu', 'reviews', 'qr', 'report', 'settings'] as Tab[]).map((k) => {
+              const Icon = k === 'orders' ? ListOrdered : k === 'history' ? History : k === 'menu' ? UtensilsCrossed : k === 'reviews' ? Star : k === 'qr' ? QrCode : k === 'settings' ? Settings : TrendingUp;
               const isActive = tab === k;
               return (
                 <button
@@ -1073,6 +1072,15 @@ export default function Dashboard() {
                         )}
                       </div>
                     </div>
+                  )}
+
+                  {tab === 'reviews' && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                      <div className="flex items-center justify-between mb-4">
+                         <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter">Customer Feedback</h2>
+                      </div>
+                      <ReviewList shopId={profile?.id || ''} />
+                    </motion.div>
                   )}
 
                   {tab === 'qr' && (
@@ -1450,6 +1458,54 @@ function QRItem({ shopId, type, no, code }: { shopId: string; type: string; no: 
       haptics.light();
     }} className="cursor-pointer active:scale-95 transition-transform">
       <canvas ref={canvasRef} className="rounded-lg shadow-sm w-full" />
+    </div>
+  );
+}
+// ─── Review List Component ───────────────────────────────────────────────────
+
+function ReviewList({ shopId }: { shopId: string }) {
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchReviews = async () => {
+      const { data } = await supabase
+        .from('reviews')
+        .select('*')
+        .eq('shop_id', shopId)
+        .order('created_at', { ascending: false });
+      if (data) setReviews(data);
+      setLoading(false);
+    };
+    if (shopId) fetchReviews();
+  }, [shopId]);
+
+  if (loading) return <div className="p-10 text-center text-slate-400">Loading reviews...</div>;
+  if (reviews.length === 0) return (
+    <div className="p-20 text-center bg-slate-100 dark:bg-slate-900/40 rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-slate-800">
+      <Star size={48} className="mx-auto mb-4 text-slate-300 opacity-30" />
+      <p className="text-sm font-black text-slate-400 uppercase tracking-widest italic">No reviews yet. Serve more customers!</p>
+    </div>
+  );
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {reviews.map((r) => (
+        <GlassCard key={r.id} intensity="medium" className="p-6">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((s) => (
+                <Star key={s} size={14} className={s <= r.rating ? "fill-yellow-400 text-yellow-400" : "text-slate-300 dark:text-slate-700"} />
+              ))}
+            </div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase">
+              {new Date(r.created_at).toLocaleDateString()}
+            </span>
+          </div>
+          {r.comment && <p className="text-sm font-medium text-slate-700 dark:text-slate-300 italic">"{r.comment}"</p>}
+          <p className="text-[10px] font-black text-brand-primary uppercase tracking-widest mt-3">Verified Order</p>
+        </GlassCard>
+      ))}
     </div>
   );
 }

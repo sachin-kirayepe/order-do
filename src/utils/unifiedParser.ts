@@ -15,14 +15,16 @@ export function parseUnifiedTranscript(transcript: string): UnifiedOrder {
   
   // 1. Extract Name
   // Patterns: "Mera naam [Name] hai", "My name is [Name]", "I am [Name]", "Name is [Name]"
-  const nameMatch = normalized.match(/(?:mera naam|my name is|i am|name is|नाम है|नाम)\s+([^,.\s]+)/i);
-  const name = nameMatch ? nameMatch[1].replace(/\b(aur|ौर)\b/g, '').trim() : undefined;
+  // TC-011 FIX: Capture multi-word names until 'hai' or 'aur'
+  const nameMatch = normalized.match(/(?:mera naam|my name is|i am|name is|नाम hai|नाम)\s+([^,.\s]+(?:\s+[^,.\s]+)*?)(?:\s+(?:hai|aur|और|is)|$)/i);
+  const name = nameMatch ? nameMatch[1].trim() : undefined;
 
   // 2. Extract Address
   // Patterns: "Main [Addr] mein rehta hoon", "I live in [Addr]", "Address [Addr] hai", "Pata [Addr] hai"
-  const addressMatch = normalized.match(/(?:address|pata|rehta hoon|stay at|live in|पता hai|पता)\s+([^,.\s]+)/i) 
-                  || normalized.match(/(?:main)\s+(.+)\s+(?:mein rehta hoon|me rehta hoon)/i);
-  const address = addressMatch ? addressMatch[1].replace(/\b(aur|ौर)\b/g, '').trim() : undefined;
+  // TC-012 FIX: Support multi-word address and better Hindi phrasing
+  const addressMatch = normalized.match(/(?:address|pata|rehta hoon|stay at|live in|पता hai|पता)\s+([^,.\s]+(?:\s+[^,.\s]+)*?)(?:\s+(?:hai|aur|और|is)|$)/i) 
+                  || normalized.match(/(?:main|mein)\s+(.+?)\s+(?:mein rehta hoon|me rehta hoon|rehta hoon)/i);
+  const address = addressMatch ? addressMatch[1].trim() : undefined;
 
   // 3. Extract Items 
   // We look for everything after "order", "chahiye", "items", or just the remainder
@@ -35,8 +37,8 @@ export function parseUnifiedTranscript(transcript: string): UnifiedOrder {
   const items = parseItems(itemsPart);
 
   return { 
-    name: name ? capitalize(name) : undefined, 
-    address: address ? capitalize(address) : undefined, 
+    name: name ? capitalizeWords(name) : undefined, 
+    address: address ? capitalizeWords(address) : undefined, 
     items 
   };
 }
@@ -58,6 +60,6 @@ function parseItems(text: string): OrderItem[] {
   });
 }
 
-function capitalize(s: string) {
-  return s.charAt(0).toUpperCase() + s.slice(1);
+function capitalizeWords(s: string) {
+  return s.split(/\s+/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }

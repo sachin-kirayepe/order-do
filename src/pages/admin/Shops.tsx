@@ -152,9 +152,19 @@ export default function AdminShops() {
     fetchShopsAndPlans(0);
 
     const channel = supabase.channel('admin-shops-sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => fetchShopsAndPlans())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shops_profile' }, () => fetchShopsAndPlans())
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payment_history' }, () => fetchShopsAndPlans())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => {
+        // Surgical Refresh: Only fetch what we already have
+        setShops([]); // Optional: to show loading or just re-fetch
+        fetchShopsAndPlans(0); 
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shops_profile' }, () => {
+        // On new shop, we might want to reset to see it at the top
+        fetchShopsAndPlans(0);
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payment_history' }, () => {
+        // Refresh to show latest confirmation times
+        fetchShopsAndPlans(0);
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -207,15 +217,16 @@ export default function AdminShops() {
       doc.setFont('helvetica', 'bold');
       
       // FIX: Handle long names with wrapping
+      // IMPROVED: Professional wrapping for long entity names
       const shopNameWrapped = doc.splitTextToSize(`Entity: ${shop.shop_name}`, 160);
       doc.text(shopNameWrapped, 20, 50);
       
+      const nextY = 50 + (shopNameWrapped.length * 7);
       const ownerNameWrapped = doc.splitTextToSize(`Authorized Personnel: ${shop.owner_name}`, 160);
-      const ownerY = 50 + (shopNameWrapped.length * 7); // Calculate Y based on wrapped lines
       
       doc.setFont('helvetica', 'normal');
-      doc.text(ownerNameWrapped, 20, ownerY);
-      doc.text(`Nexus ID: ${shop.shop_id}`, 20, ownerY + 8);
+      doc.text(ownerNameWrapped, 20, nextY);
+      doc.text(`Nexus ID: ${shop.shop_id}`, 20, nextY + (ownerNameWrapped.length * 7));
 
       const tableData = [
         ['Protocol ID', p.id.slice(0, 8).toUpperCase()],
@@ -251,24 +262,37 @@ export default function AdminShops() {
 
   const handleSaveSubscription = async () => {
     if (!selectedShop) return;
+    
+    // Validation
+    if (!subForm.is_auto_mode && !subForm.expiry_date) {
+      toast.error('Validation Error: Please specify a manual lapse date');
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const combinedExpiry = new Date(`${subForm.expiry_date}T${subForm.expiry_time}:00`);
-      
-      const { error } = await supabase.from('subscriptions').upsert({
+      const payload: any = {
         shop_id: selectedShop.id,
         status: subForm.status,
         plan_id: subForm.plan_id,
-        expiry_date: combinedExpiry.toISOString(),
         is_auto_mode: subForm.is_auto_mode,
         last_manual_override_at: !subForm.is_auto_mode ? new Date().toISOString() : null
-      }, { onConflict: 'shop_id' });
+      };
+
+      // Only update expiry if in manual mode or if specifically changed
+      if (!subForm.is_auto_mode) {
+        const combinedExpiry = new Date(`${subForm.expiry_date}T${subForm.expiry_time}:00`);
+        if (isNaN(combinedExpiry.getTime())) throw new Error('Invalid temporal coordinates');
+        payload.expiry_date = combinedExpiry.toISOString();
+      }
+
+      const { error } = await supabase.from('subscriptions').upsert(payload, { onConflict: 'shop_id' });
 
       if (error) throw error;
 
       toast.success('Protocol configuration synchronized');
       setSelectedShop(null);
-      fetchShopsAndPlans();
+      fetchShopsAndPlans(currentPage); // Preserve current page
     } catch (err: any) {
       toast.error(`Sync failure: ${err.message}`);
     } finally {

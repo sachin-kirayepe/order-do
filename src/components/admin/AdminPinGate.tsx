@@ -21,7 +21,7 @@ export const AdminPinGate = ({ children }: { children: React.ReactNode }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pin.length < 4) return;
+    if (pin.length < 6) return;
 
     setIsVerifying(true);
     setError(false);
@@ -108,7 +108,7 @@ export const AdminPinGate = ({ children }: { children: React.ReactNode }) => {
               <div className="flex flex-col gap-4">
                 <Button 
                   type="submit"
-                  disabled={pin.length < 4 || isVerifying}
+                  disabled={pin.length < 6 || isVerifying}
                   variant="primary"
                   className="w-full h-16 !rounded-2xl shadow-glow-green group relative overflow-hidden"
                 >

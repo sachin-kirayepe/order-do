@@ -45,7 +45,8 @@ export default function AdminDashboard() {
     totalShops: 0,
     activeSubs: 0,
     pendingPayments: 0,
-    revenue: 0
+    revenue: 0,
+    pendingDisputes: 0
   });
   const [recentActivity, setRecentActivity] = useState<Activity[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
@@ -64,18 +65,25 @@ export default function AdminDashboard() {
         supabase.from('payment_history').select('*').eq('status', 'confirmed')
       ]);
 
-      const { count: manualPendingCount } = await supabase.from('subscriptions').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+      const { data: pendingSubsData } = await supabase.from('subscriptions').select('shop_id').eq('status', 'pending');
       
       const paymentShopIds = new Set(paymentsRes.data?.map(p => p.shop_id) || []);
-      const totalPending = paymentShopIds.size + (manualPendingCount || 0);
+      const subPendingIds = new Set(pendingSubsData?.map(s => s.shop_id) || []);
+      
+      // FIX: Atomic Set to prevent double counting
+      const uniquePending = new Set([...paymentShopIds, ...subPendingIds]);
+      const totalPending = uniquePending.size;
 
       const totalRevenue = confirmedRes.data?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+
+      const { data: pendingDisputes } = await supabase.from('disputes').select('*', { count: 'exact', head: true }).eq('status', 'pending');
 
       setStats({
         totalShops: shopsRes.count || 0,
         activeSubs: subsRes.count || 0,
         pendingPayments: totalPending,
-        revenue: totalRevenue
+        revenue: totalRevenue,
+        pendingDisputes: pendingDisputes?.length || 0
       });
 
       const last7Days = [...Array(7)].map((_, i) => {
@@ -214,7 +222,7 @@ export default function AdminDashboard() {
   const cardData = [
     { label: 'Network Reach', sub: 'Active Shops', value: stats.totalShops, icon: <Users size={20} />, color: 'brand-primary', path: '/admin/shops' },
     { label: 'Active Coverage', sub: 'Subscription Live', value: stats.activeSubs, icon: <LayoutDashboard size={20} />, color: 'brand-secondary', path: '/admin/plans' },
-    { label: 'Pending Bridge', sub: 'Unconfirmed Subs', value: stats.pendingPayments, icon: <Zap size={20} />, color: 'amber-500', path: '/admin/payments' },
+    { label: 'Conflict Zone', sub: 'Pending Disputes', value: stats.pendingDisputes, icon: <ShieldCheck size={20} />, color: 'red-500', path: '/admin/disputes' },
     { label: 'Gross Revenue', sub: 'Lifetime Confirmed', value: stats.revenue, icon: <CreditCard size={20} />, color: 'indigo-500', path: '/admin/payments', isCurrency: true },
   ];
 

@@ -24,6 +24,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import GlassCard from '../../components/ui/GlassCard';
 import Button from '../../components/ui/Button';
+import { useVoice } from '../../context/VoiceContext';
 
 export default function AdminSettings() {
   const [globalFree, setGlobalFree] = useState(false);
@@ -33,6 +34,7 @@ export default function AdminSettings() {
   
   // Master PIN State
   const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
   const [showPin, setShowPin] = useState(false);
   const [isUpdatingPin, setIsUpdatingPin] = useState(false);
   const [shopProfile, setShopProfile] = useState<any>(null);
@@ -70,6 +72,12 @@ export default function AdminSettings() {
       }
     }
     fetchData();
+
+    const channel = supabase.channel('admin-settings-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_settings' }, () => fetchData())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const toggleGlobalFree = async () => {
@@ -125,8 +133,13 @@ export default function AdminSettings() {
   };
 
   const handleUpdatePin = async () => {
-    if (!newPin || newPin.length < 4) {
-      toast.error('Insecure Input: PIN must be at least 4 characters');
+    if (!newPin || newPin.length !== 6) {
+      toast.error('Insecure Input: PIN must be exactly 6 digits for protocol safety');
+      return;
+    }
+
+    if (newPin !== confirmPin) {
+      toast.error('Synchronization Error: PINs do not match');
       return;
     }
 
@@ -140,6 +153,7 @@ export default function AdminSettings() {
         icon: <ShieldCheck className="text-brand-primary" />
       });
       setNewPin('');
+      setConfirmPin('');
     } catch (err: any) {
       console.error('PIN Update Failure:', err);
       toast.error('Protocol Rejection: ' + err.message);
@@ -320,37 +334,49 @@ export default function AdminSettings() {
                     <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest italic">Encrypted (Bcrypt)</span>
                  </div>
                  
-                 <div className="space-y-4">
+                  <div className="space-y-4">
                     <p className="text-[10px] font-bold text-slate-400 uppercase leading-relaxed tracking-widest">
-                       Set the global Master PIN for vault access. This PIN is hashed on the server and cannot be recovered if lost.
+                       Set the global Master PIN for vault access. This PIN is hashed using Bcrypt on the server.
                     </p>
                     
-                    <div className="relative group">
-                       <input 
-                         type={showPin ? 'text' : 'password'}
-                         value={newPin}
-                         onChange={(e) => setNewPin(e.target.value)}
-                         placeholder="Configure New Secret..."
-                         className="w-full h-14 bg-white/10 dark:bg-slate-950/50 border-2 border-white/10 dark:border-white/5 rounded-2xl px-6 pr-24 text-sm font-black tracking-[0.3em] outline-none focus:border-brand-secondary/50 transition-all placeholder:text-slate-500/30 placeholder:tracking-normal"
-                       />
-                       <div className="absolute right-2 top-2 flex gap-1">
+                    <div className="space-y-3">
+                       <div className="relative group">
+                          <input 
+                            type={showPin ? 'text' : 'password'}
+                            value={newPin}
+                            onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                            placeholder="6-digit Master PIN..."
+                            className="w-full h-14 bg-white/10 dark:bg-slate-950/50 border-2 border-white/10 dark:border-white/5 rounded-2xl px-6 text-sm font-black tracking-[0.3em] outline-none focus:border-brand-secondary/50 transition-all placeholder:text-slate-500/30 placeholder:tracking-normal"
+                          />
                           <button 
                             onClick={() => setShowPin(!showPin)}
-                            className="p-3 text-slate-500 hover:text-brand-secondary transition-colors"
+                            className="absolute right-4 top-4 text-slate-500 hover:text-brand-secondary transition-colors"
                           >
                              {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
                           </button>
+                       </div>
+
+                       <input 
+                         type={showPin ? 'text' : 'password'}
+                         value={confirmPin}
+                         onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                         placeholder="Confirm Secret..."
+                         className="w-full h-14 bg-white/10 dark:bg-slate-950/50 border-2 border-white/10 dark:border-white/5 rounded-2xl px-6 text-sm font-black tracking-[0.3em] outline-none focus:border-brand-secondary/50 transition-all placeholder:text-slate-500/30 placeholder:tracking-normal"
+                       />
+
+                       <div className="grid grid-cols-2 gap-3">
                           <Button 
                             onClick={handleUpdatePin}
                             isLoading={isUpdatingPin}
-                            className="h-10 px-4 !rounded-xl shadow-glow-secondary/20"
+                            className="h-14 !rounded-2xl shadow-glow-secondary/20"
                             variant="primary"
                           >
-                             <Save size={14} className="mr-2" /> Set
+                             <Save size={14} className="mr-2" /> Sync
                           </Button>
+                          <VoiceTestButton />
                        </div>
                     </div>
-                 </div>
+                  </div>
               </div>
 
               <div className="p-5 bg-red-500/5 rounded-2xl border border-red-500/10 flex items-start gap-4">
@@ -473,6 +499,21 @@ function SettingsItem({ icon: Icon, label, sub, active, onClick }: any) {
   );
 }
 
+function VoiceTestButton() {
+  const { speak, isSpeaking, stop } = useVoice();
+  
+  return (
+    <Button 
+      variant="ghost" 
+      onClick={() => isSpeaking ? stop() : speak("Hello Admin, Dhara AI voice engine is online and ready for orders.")}
+      className={`h-14 !rounded-2xl border-2 transition-all ${isSpeaking ? 'border-brand-primary bg-brand-primary/10' : 'border-white/10'}`}
+    >
+       <ActivityIcon size={14} className={`mr-2 ${isSpeaking ? 'animate-pulse text-brand-primary' : ''}`} />
+       {isSpeaking ? 'Stop Test' : 'Test Voice'}
+    </Button>
+  );
+}
+
 function ActionButton({ icon: Icon, label, accent = "slate-400" }: any) {
   return (
     <Button 
@@ -483,4 +524,8 @@ function ActionButton({ icon: Icon, label, accent = "slate-400" }: any) {
        <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 group-hover:text-brand-primary transition-colors">{label}</span>
     </Button>
   );
+}
+
+function ActivityIcon({ size, className }: { size: number, className: string }) {
+    return <Activity size={size} className={className} />;
 }

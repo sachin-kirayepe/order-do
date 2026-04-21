@@ -21,7 +21,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import GlassCard from '../../components/ui/GlassCard';
-import { formatIndianDateTime, addDurationDays } from '../../utils/dateUtils';
+import { formatIndianDateTime } from '../../utils/dateUtils';
 
 interface PendingPayment {
   id: string;
@@ -33,6 +33,7 @@ interface PendingPayment {
   status: string;
   created_at: string;
   confirmed_at?: string;
+  payment_proof_url?: string;
   shop: { shop_name: string; shop_id: string };
   plan: { 
     name: string; 
@@ -57,6 +58,7 @@ export default function AdminPayments() {
     utr: ''
   });
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isBankVerified, setIsBankVerified] = useState(false);
 
   const fetchPayments = useCallback(async () => {
     setLoading(true);
@@ -130,6 +132,7 @@ export default function AdminPayments() {
       method: 'UPI',
       utr: payment.utr || ''
     });
+    setIsBankVerified(false);
   };
 
   const processConfirmation = async () => {
@@ -137,58 +140,25 @@ export default function AdminPayments() {
     setIsProcessing(true);
     
     try {
-      const now = new Date();
+      const daysToAdd = confirmingPayment.duration_days || 30;
       
-      const { data: subData } = await supabase
-        .from('subscriptions')
-        .select('is_auto_mode, expiry_date')
-        .eq('shop_id', confirmingPayment.shop_id)
-        .single();
+      // NEW: Atomic Protocol Execution
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('confirm_payment_protocol', {
+        p_shop_id: confirmingPayment.shop_id,
+        p_admin_id: adminUser.id,
+        p_payment_id: confirmingPayment.id.startsWith('manual-') ? null : confirmingPayment.id,
+        p_amount: confirmForm.amount,
+        p_method: confirmForm.method,
+        p_utr: confirmForm.utr,
+        p_days_to_add: daysToAdd,
+        p_plan_id: confirmingPayment.plan_id,
+        p_is_manual: confirmingPayment.id.startsWith('manual-')
+      });
 
-      const isAuto = subData?.is_auto_mode !== false;
-      const currentExpiry = subData?.expiry_date;
-      
-      let finalExpiry = currentExpiry;
-      const daysToAdd = confirmingPayment.duration_days || confirmingPayment.plan?.duration_days || 30;
+      if (rpcErr) throw rpcErr;
+      if (!(rpcRes as any).success) throw new Error((rpcRes as any).error);
 
-      if (isAuto) {
-        finalExpiry = addDurationDays(now, daysToAdd);
-      }
-
-      const { error: histErr } = await supabase.from('payment_history').insert([{
-        shop_id: confirmingPayment.shop_id,
-        admin_id: adminUser.id,
-        amount: confirmForm.amount,
-        payment_method: confirmForm.method,
-        utr_number: confirmForm.utr,
-        duration_days: daysToAdd,
-        confirmed_at: now.toISOString(),
-        status: 'confirmed',
-        plan_id: confirmingPayment.plan_id
-      }]);
-      if (histErr) throw histErr;
-
-      if (!confirmingPayment.id.startsWith('manual-')) {
-        await supabase.from('payments').update({ 
-          status: 'confirmed', 
-          confirmed_at: now.toISOString() 
-        }).eq('id', confirmingPayment.id);
-      }
-
-      const subUpdate: any = {
-        shop_id: confirmingPayment.shop_id,
-        plan_id: confirmingPayment.plan_id,
-        status: 'active'
-      };
-      
-      if (isAuto) {
-        subUpdate.expiry_date = finalExpiry;
-      }
-
-      const { error: subErr } = await supabase.from('subscriptions').upsert(subUpdate, { onConflict: 'shop_id' });
-      if (subErr) throw subErr;
-
-      toast.success(isAuto ? `Transmission verified. Extended until ${finalExpiry.split('T')[0]}` : 'Transaction archived. Manual override respected.');
+      toast.success(`Protocol Confirmed. Expiry: ${formatIndianDateTime((rpcRes as any).new_expiry, language)}`);
 
       setConfirmingPayment(null);
       fetchPayments();
@@ -403,20 +373,44 @@ export default function AdminPayments() {
                            onChange={(e) => setConfirmForm({...confirmForm, utr: e.target.value})}
                            placeholder="Enter Validation Hash"
                          />
+                         
+                         <div className="space-y-4">
+                             <div 
+                               onClick={() => setIsBankVerified(!isBankVerified)}
+                               className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex items-start gap-4 ${isBankVerified ? 'bg-brand-primary/10 border-brand-primary' : 'bg-red-500/5 border-red-500/20 animate-pulse'}`}
+                             >
+                                <div className={`mt-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${isBankVerified ? 'bg-brand-primary border-brand-primary' : 'border-slate-400'}`}>
+                                   {isBankVerified && <ShieldCheck size={14} className="text-white" />}
+                                </div>
+                                <div>
+                                   <p className={`text-[10px] font-black uppercase tracking-widest ${isBankVerified ? 'text-brand-primary' : 'text-red-500'}`}>
+                                      I have verified ₹{confirmForm.amount} in Bank Statement
+                                   </p>
+                                   <p className="text-[9px] font-bold text-slate-500 leading-tight mt-1">
+                                      Confirming without checking bank statement can lead to financial loss.
+                                   </p>
+                                </div>
+                             </div>
 
-                         <div className="bg-brand-secondary/5 border border-brand-secondary/20 p-6 rounded-[2rem] flex items-start gap-4">
-                            <Sparkles className="text-brand-secondary shrink-0 mt-1" size={20} />
-                             <p className="text-[10px] font-black text-brand-secondary uppercase leading-relaxed tracking-widest">
-                               Verification will initialize a **{confirmingPayment.duration_days || 30} Day Cycle** extension on the target nexus.
-                             </p>
-                         </div>
+                             <div className="bg-brand-secondary/5 border border-brand-secondary/20 p-6 rounded-[2rem] flex items-start gap-4">
+                                <Sparkles className="text-brand-secondary shrink-0 mt-1" size={20} />
+                                 <p className="text-[10px] font-black text-brand-secondary uppercase leading-relaxed tracking-widest">
+                                   Verification will initialize a **{confirmingPayment.duration_days || 30} Day Cycle** extension on the target nexus.
+                                 </p>
+                             </div>
+                          </div>
 
-                         <div className="flex gap-4 pt-4">
-                            <Button variant="ghost" className="flex-1 h-14 !rounded-2xl font-black uppercase tracking-widest text-slate-500" onClick={() => setConfirmingPayment(null)}>Abort</Button>
-                            <Button className="flex-2 h-14 !rounded-2xl shadow-glow-green" variant="primary" disabled={isProcessing} onClick={processConfirmation}>
-                               {isProcessing ? 'Verifying Cipher...' : 'Authorize Activation ✓'}
-                            </Button>
-                         </div>
+                          <div className="flex gap-4 pt-4">
+                             <Button variant="ghost" className="flex-1 h-14 !rounded-2xl font-black uppercase tracking-widest text-slate-500" onClick={() => setConfirmingPayment(null)}>Abort</Button>
+                             <Button 
+                               className="flex-2 h-14 !rounded-2xl shadow-glow-green" 
+                               variant="primary" 
+                               disabled={isProcessing || !isBankVerified} 
+                               onClick={processConfirmation}
+                             >
+                                {isProcessing ? 'Verifying Cipher...' : 'Authorize Activation ✓'}
+                             </Button>
+                          </div>
                      </div>
                   </GlassCard>
                </motion.div>

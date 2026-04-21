@@ -16,7 +16,9 @@ import {
   Cpu,
   Fingerprint,
   Radio,
-  ArrowRight
+  ArrowRight,
+  Camera,
+  Image as ImageIcon
 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
@@ -65,6 +67,7 @@ export default function Plans() {
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [paymentType, setPaymentType] = useState<'monthly' | 'yearly'>('monthly');
   const [utr, setUtr] = useState('');
+  const [proofImage, setProofImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -98,6 +101,11 @@ export default function Plans() {
       return;
     }
 
+    if (!proofImage) {
+      toast.error('VERIFICATION ERROR: Payment screenshot required');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const { data: shopProfile } = await supabase
@@ -108,7 +116,7 @@ export default function Plans() {
 
       if (!shopProfile) {
         toast.error('NODE NOT FOUND: Complete shop initialization first.');
-        setIsSubmitting(false); // FIXED: Prevent permanent loading state
+        setIsSubmitting(false);
         return;
       }
 
@@ -118,6 +126,7 @@ export default function Plans() {
         amount: paymentType === 'monthly' ? selectedPlan?.monthly_price : selectedPlan?.yearly_price,
         duration_days: paymentType === 'monthly' ? 30 : 365,
         utr: utr.trim(),
+        payment_proof_url: proofImage,
         status: 'pending'
       }]);
 
@@ -126,6 +135,7 @@ export default function Plans() {
       toast.success('PAYLOAD SENT: Admin will verify and activate your node shortly.');
       setSelectedPlan(null);
       setUtr('');
+      setProofImage(null);
     } catch (err: any) {
       console.error('Payment submission full error:', err);
       toast.error(err.message || 'TRANSMISSION FAILURE: Uplink rejected');
@@ -404,10 +414,10 @@ export default function Plans() {
                         </div>
                         <div className="space-y-4">
                            <Input 
-                              placeholder="12-DIGIT PROTOCOL UTR" 
-                              value={utr}
-                              onChange={(e) => setUtr(e.target.value)}
-                              className="h-16 bg-white/5 border-white/10 focus:border-brand-primary font-mono text-center tracking-[0.4em] font-black text-lg transition-all"
+                               placeholder="12-DIGIT PROTOCOL UTR" 
+                               value={utr}
+                               onChange={(e) => setUtr(e.target.value)}
+                               className="h-16 bg-white/5 border-white/10 focus:border-brand-primary font-mono text-center tracking-[0.4em] font-black text-lg transition-all"
                            />
                            <div className="flex items-center gap-3 px-2">
                               <Zap size={14} className="text-brand-secondary" />
@@ -415,6 +425,44 @@ export default function Plans() {
                            </div>
                         </div>
                      </div>
+
+                     <div className="space-y-6">
+                        <div className="flex items-center gap-4">
+                           <div className="w-10 h-10 rounded-xl bg-indigo-500 text-white flex items-center justify-center shadow-glow-indigo">
+                              <Camera size={20} strokeWidth={3} />
+                           </div>
+                           <h3 className="text-sm font-black text-white uppercase tracking-widest italic">Phase 3: Visual Proof</h3>
+                        </div>
+                        
+                        <div className="relative group/upload">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => setProofImage(reader.result as string);
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                          />
+                          <div className={`w-full h-32 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center gap-2 transition-all ${proofImage ? 'border-brand-primary bg-brand-primary/5' : 'border-white/10 bg-white/5 hover:border-brand-primary/30'}`}>
+                            {proofImage ? (
+                              <>
+                                <img src={proofImage} className="w-16 h-16 object-cover rounded-lg border border-brand-primary/20" alt="Proof" />
+                                <span className="text-[8px] font-black text-brand-primary uppercase tracking-widest italic">Screenshot Attached ✓</span>
+                              </>
+                            ) : (
+                              <>
+                                <ImageIcon size={24} className="text-slate-600 group-hover/upload:text-brand-primary transition-colors" />
+                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest italic">Upload Payment Screenshot</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
 
                      <Button 
                         onClick={handlePurchase}

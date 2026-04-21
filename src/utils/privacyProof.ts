@@ -84,15 +84,23 @@ export async function createProofAndDeletePersonalData(orderId: string, total: n
  */
 export async function performPrivacyAudit() {
     const history = await db.orderHistory.toArray();
-    for (const h of history) {
-        if (h.photoDataUrl && h.photoDataUrl.startsWith('data:image')) {
-            console.warn(`[PrivacyAudit] Found stale personal data in history record: ${h.id}. Cleaning up...`);
-            await db.orderHistory.update(h.id, {
-                photoDataUrl: 'DELETED_BY_AUDIT',
-                customerName: await encrypt('Customer #' + h.id.slice(0, 4), h.shopId),
-                customerAddress: 'DELETED_BY_AUDIT'
-            });
+    const staleRecords = history.filter(h => h.photoDataUrl && h.photoDataUrl.startsWith('data:image'));
+    
+    if (staleRecords.length === 0) return;
+
+    console.log(`[PrivacyAudit] Found ${staleRecords.length} stale records. Cleaning up...`);
+
+    const updates = await Promise.all(staleRecords.map(async (h) => ({
+        id: h.id,
+        changes: {
+            photoDataUrl: 'DELETED_BY_AUDIT',
+            customerName: await encrypt('Customer #' + h.id.slice(0, 4), h.shopId),
+            customerAddress: 'DELETED_BY_AUDIT'
         }
+    })));
+
+    for (const update of updates) {
+        await db.orderHistory.update(update.id, update.changes);
     }
 }
 
@@ -205,23 +213,26 @@ export async function purgeStalePendingOrders(thresholdHours: number = 4) {
     const now = Date.now();
 
     const pending = await db.pendingOrders.toArray();
-    for (const order of pending) {
-        const age = now - order.createdAt;
-        if (age > thresholdMs) {
-            // Anonymize even if not finished
-            await db.pendingOrders.update(order.id, {
-                customerName: await encrypt(`Customer #${order.id.slice(0, 4)}`, order.shopId),
-                customerPhone: '',
-                customerAddress: await encrypt('REDACTED', order.shopId),
-                photoDataUrl: ''
-            });
+    const staleOrders = pending.filter(order => (now - order.createdAt) > thresholdMs);
 
-            // Update cloud
-            await supabase.from('pending_orders').update({
-                customer_name: `Customer #${order.id.slice(0, 4)}`,
-                customer_phone: null,
-                photo_data_url: null
-            }).eq('id', order.id);
-        }
-    }
+    if (staleOrders.length === 0) return;
+
+    console.log(`[PrivacyPurge] Purging ${staleOrders.length} stale pending orders...`);
+
+    await Promise.all(staleOrders.map(async (order) => {
+        // Anonymize local
+        await db.pendingOrders.update(order.id, {
+            customerName: await encrypt(`Customer #${order.id.slice(0, 4)}`, order.shopId),
+            customerPhone: '',
+            customerAddress: await encrypt('REDACTED', order.shopId),
+            photoDataUrl: ''
+        });
+
+        // Update cloud
+        await supabase.from('pending_orders').update({
+            customer_name: `Customer #${order.id.slice(0, 4)}`,
+            customer_phone: null,
+            photo_data_url: null
+        }).eq('id', order.id);
+    }));
 }

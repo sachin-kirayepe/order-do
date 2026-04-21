@@ -46,6 +46,7 @@ export interface OrderItem {
   name: string;
   quantity: string;
   price?: number; // shopkeeper fills this
+  originalPrice?: number; // NEW: To track price changes
 }
 
 export interface PendingOrder {

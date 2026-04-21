@@ -38,6 +38,7 @@ const AdminShops = lazy(() => import('./pages/admin/Shops'));
 const AdminPayments = lazy(() => import('./pages/admin/Payments'));
 const AdminMessages = lazy(() => import('./pages/admin/Messages'));
 const AdminSettings = lazy(() => import('./pages/admin/Settings'));
+const AdminDisputes = lazy(() => import('./pages/admin/Disputes'));
 
 const PrivacyPolicy = lazy(() => import('./pages/legal/PrivacyPolicy'));
 const TermsAndConditions = lazy(() => import('./pages/legal/TermsAndConditions'));
@@ -114,6 +115,7 @@ function AppContent() {
             <Route path="payments" element={<AdminPayments />} />
             <Route path="messages" element={<AdminMessages />} />
             <Route path="settings" element={<AdminSettings />} />
+            <Route path="disputes" element={<AdminDisputes />} />
           </Route>
 
           {/* Fallback */}

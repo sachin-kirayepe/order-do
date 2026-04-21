@@ -1,13 +1,13 @@
 import db from '../db/dexie';
 
-const THIRTY_MINUTES = 30 * 60 * 1000;
+const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
 
 /**
- * Delete pending orders and temp orders older than 30 minutes.
+ * Delete pending orders and temp orders older than 24 hours.
  * Call this on app startup and periodically.
  */
 export async function cleanupStaleOrders() {
-  const cutoff = Date.now() - THIRTY_MINUTES;
+  const cutoff = Date.now() - TWENTY_FOUR_HOURS;
 
   // Clean old temp orders
   try {

@@ -11,18 +11,21 @@ import {
   ShieldCheck,
   MessageSquare,
   CreditCard as PaymentIcon,
-  ChevronRight
+  ChevronRight,
+  BookOpen
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import LanguageSwitcher from '../../components/ui/LanguageSwitcher';
 import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../../components/ui/Button';
 import GlassCard from '../../components/ui/GlassCard';
+import AdminMasterGuide from '../../components/admin/AdminMasterGuide';
 
 export default function AdminLayout() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   const menuItems = [
     { name: 'Console', path: '/admin', icon: <LayoutDashboard size={18} /> },
@@ -111,6 +114,20 @@ export default function AdminLayout() {
                   )}
                 </NavLink>
               ))}
+              
+              <button
+                onClick={() => setIsGuideOpen(true)}
+                className="w-full mt-6 flex items-center justify-between px-6 py-5 rounded-[2rem] font-black text-[10px] uppercase tracking-widest transition-all group bg-white/5 border border-white/5 hover:border-brand-primary/20 hover:bg-brand-primary/5 text-slate-400 hover:text-brand-primary"
+              >
+                <div className="flex items-center gap-3">
+                  <BookOpen size={18} className="text-brand-primary group-hover:scale-110 transition-transform" />
+                  Master Guide
+                </div>
+                <div className="flex items-center gap-2">
+                   <span className="text-[8px] bg-brand-primary/10 px-2 py-0.5 rounded-full">New</span>
+                   <ChevronRight size={14} className="opacity-50" />
+                </div>
+              </button>
             </nav>
 
             {/* BOTTOM ACTIONS */}
@@ -155,6 +172,7 @@ export default function AdminLayout() {
           </div>
         </div>
       </main>
+      <AdminMasterGuide isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
     </div>
   );
 }

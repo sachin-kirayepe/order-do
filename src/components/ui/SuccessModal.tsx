@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, Home, Sparkles, Receipt, Star, Shield } from 'lucide-react';
+import { CheckCircle, Home, Sparkles, Receipt, Star, Shield, Lock } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
@@ -23,6 +23,11 @@ interface SuccessModalProps {
   onShareReceipt?: () => void;
   orderStatus?: string; // e.g. 'pending', 'accepted', 'preparing', 'ready', 'completed'
   feedbackEnabled?: boolean;
+  onConfirmPickup?: () => Promise<void>;
+  onDispute?: (reason: string, screenshot: string) => Promise<void>;
+  pickupOtp?: string;
+  originalTranscript?: string;
+  initialTotal?: number;
 }
 
 export default function SuccessModal({ 
@@ -33,7 +38,12 @@ export default function SuccessModal({
   orderSummary, 
   onShareReceipt,
   orderStatus = 'pending',
-  feedbackEnabled = true
+  feedbackEnabled = true,
+  onConfirmPickup,
+  onDispute,
+  pickupOtp,
+  originalTranscript,
+  initialTotal
 }: SuccessModalProps) {
   const { t, language } = useLanguage();
   const [rating, setRating] = useState(0);
@@ -65,10 +75,10 @@ export default function SuccessModal({
     if (rating === 0 || !shopUUID) return;
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from('order_feedback').insert({
+      const { error } = await supabase.from('reviews').insert({
         shop_id: shopUUID,
-        order_id: orderId || `temp-${Date.now()}`,
-        stars: rating,
+        order_id: orderId || null,
+        rating: rating,
         comment: comment.trim() || null
       });
 
@@ -76,12 +86,23 @@ export default function SuccessModal({
       setFeedbackSent(true);
       toast.success(language === 'hi' ? 'फीडबैक के लिए धन्यवाद!' : 'Thanks for your feedback!');
       haptics.success();
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) {
       toast.error('Failed to send feedback');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [disputeReason, setDisputeReason] = useState('');
+
+  const handleDisputeSubmit = async () => {
+    if (!disputeReason.trim() || !onDispute) return;
+    setIsSubmitting(true);
+    await onDispute(disputeReason, ''); // Screenshot logic could be added later
+    setShowDisputeModal(false);
+    setIsSubmitting(false);
+    onClose();
   };
 
   const showFeedback = feedbackEnabled && (orderStatus === 'ready' || orderStatus === 'completed');
@@ -141,20 +162,73 @@ export default function SuccessModal({
                 </h2>
 
                 {/* Verification ID Section */}
-                {orderId && (
-                  <div className="w-full mb-6 p-4 bg-slate-100 dark:bg-slate-900/60 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700/50 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-1">
-                       <Shield size={10} className="text-brand-primary opacity-30" />
-                    </div>
-                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Digital Verification ID</p>
-                    <div className="flex items-center justify-center gap-2">
-                      <span className="text-xl font-mono font-black text-brand-primary tracking-widest uppercase italic">
+                <div className="w-full grid grid-cols-2 gap-3 mb-6">
+                  {orderId && (
+                    <div className="p-4 bg-slate-100 dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-700/50 relative overflow-hidden">
+                      <p className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1">Order ID</p>
+                      <span className="text-sm font-mono font-black text-brand-primary uppercase italic">
                         ORD-{orderId.slice(0, 4).toUpperCase()}
                       </span>
                     </div>
-                    <p className="text-[8px] font-bold text-slate-500 mt-1 italic">Show this to shopkeeper for verification</p>
-                  </div>
-                )}
+                  )}
+                  {pickupOtp && (
+                    <div className="p-4 bg-brand-primary/10 rounded-2xl border-2 border-brand-primary shadow-glow-green/20 relative overflow-hidden">
+                      <p className="text-[8px] font-black uppercase tracking-widest text-brand-primary mb-1">Pickup OTP</p>
+                      <span className="text-xl font-mono font-black text-brand-primary tracking-widest">
+                        {pickupOtp}
+                      </span>
+                      <div className="absolute top-0 right-0 p-1">
+                        <Lock size={10} className="text-brand-primary animate-pulse" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* ANTI-FRAUD: Price & Weight Guard */}
+                <div className="w-full space-y-3 mb-6">
+                  {initialTotal !== undefined && orderSummary && orderSummary.totalAmount > initialTotal && (
+                    <motion.div 
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="p-3 bg-orange-500/10 border border-orange-500/30 rounded-2xl flex items-start gap-3 text-left"
+                    >
+                      <Shield className="text-orange-500 shrink-0 mt-0.5" size={16} />
+                      <div>
+                        <p className="text-[10px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-widest">Price Discrepancy Detected</p>
+                        <p className="text-[9px] font-bold text-slate-500 leading-tight mt-0.5">
+                          {language === 'hi' 
+                            ? `Shopkeeper ne bill ₹${orderSummary.totalAmount - initialTotal} badha diya hai. Kripya check karein.`
+                            : `Shopkeeper increased bill by ₹${orderSummary.totalAmount - initialTotal}. Please verify items.`}
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {orderStatus === 'ready' && (
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="p-3 bg-brand-primary/10 border border-brand-primary/30 rounded-2xl flex items-start gap-3 text-left"
+                    >
+                      <Sparkles className="text-brand-primary shrink-0 mt-0.5" size={16} />
+                      <div>
+                        <p className="text-[10px] font-black text-brand-primary uppercase tracking-widest">Quantity Guard Active</p>
+                        <p className="text-[9px] font-bold text-slate-500 leading-tight mt-0.5">
+                          {language === 'hi' 
+                            ? 'Saman lete waqt uska wazan (weight) aur ginti zaroor check karein!'
+                            : 'Please verify the weight and count of items before providing the Pickup OTP.'}
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {originalTranscript && (
+                    <div className="p-3 bg-slate-100 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-2xl text-left">
+                       <p className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1">Your Voice Record</p>
+                       <p className="text-[10px] italic font-medium text-slate-600 dark:text-slate-400 leading-tight">"{originalTranscript}"</p>
+                    </div>
+                  )}
+                </div>
 
                 {/* Feedback Section */}
                 {showFeedback && !feedbackSent && (
@@ -223,6 +297,40 @@ export default function SuccessModal({
                 )}
 
                 <div className="w-full space-y-4">
+                  {orderStatus === 'ready' && onConfirmPickup && (
+                    <Button 
+                      onClick={onConfirmPickup} 
+                      variant="primary" 
+                      className="w-full h-14 !rounded-xl shadow-glow-green text-sm font-black uppercase italic tracking-widest text-white animate-bounce"
+                    >
+                      <CheckCircle size={18} className="mr-3" />
+                      {language === 'hi' ? 'ऑर्डर मिल गया ✓' : 'I have received Order ✓'}
+                    </Button>
+                  )}
+
+                  {orderStatus === 'rejected' && onDispute && (
+                    <div className="p-4 bg-red-500/10 rounded-2xl border border-red-500/20 mb-4">
+                      <p className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-3">Order Rejected? If paid via UPI, dispute it.</p>
+                      {showDisputeModal ? (
+                        <div className="space-y-3">
+                          <textarea
+                            placeholder="Why are you disputing? (e.g. Paid but rejected)"
+                            value={disputeReason}
+                            onChange={(e) => setDisputeReason(e.target.value)}
+                            className="w-full bg-white dark:bg-slate-900 border border-red-500/30 rounded-xl p-2 text-xs outline-none h-16"
+                          />
+                          <Button onClick={handleDisputeSubmit} isLoading={isSubmitting} className="w-full h-10 !bg-red-500 !text-white !rounded-xl text-[10px] uppercase font-black">
+                            Register Dispute
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button onClick={() => setShowDisputeModal(true)} variant="ghost" className="w-full h-10 !rounded-xl text-[10px] uppercase font-black text-red-500 border border-red-500/30">
+                          Raise a Dispute
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
                   {onShareReceipt && (
                     <Button onClick={onShareReceipt} variant="ghost" className="w-full h-14 !rounded-xl text-sm font-black uppercase text-brand-primary tracking-widest border border-brand-primary/20">
                       <Receipt size={18} className="mr-3" />

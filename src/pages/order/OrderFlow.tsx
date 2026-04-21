@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { Camera, User, MapPin, ShoppingBasket, ClipboardCheck, ArrowLeft, ArrowRight, Sun, Moon, Mic, ChevronRight } from 'lucide-react';
+import { Camera, User, MapPin, ShoppingBasket, ClipboardCheck, ArrowLeft, ArrowRight, Sun, Moon, Mic, ChevronRight, AlertCircle, HelpCircle } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -26,7 +26,7 @@ import GlassCard from '../../components/ui/GlassCard';
 import Input from '../../components/ui/Input';
 import { compressPhoto } from '../../utils/compress';
 import VisualTutorial from '../../components/customer/VisualTutorial';
-import { HelpCircle } from 'lucide-react';
+
 
 const SpeechRecognition =
   (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -57,6 +57,15 @@ export default function OrderFlow() {
   const [customerAddress, setCustomerAddressRaw] = useState('');
   const [pincode, setPincode] = useState('');
   const [items, setItems] = useState<OrderItem[]>([]);
+  const [customerOrderCount, setCustomerOrderCount] = useState(0);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      const { count } = await supabase.from('order_proofs').select('*', { count: 'exact', head: true }).eq('hashed_name', customerPhone); // Simplified check
+      setCustomerOrderCount(count || 0);
+    };
+    if (customerPhone.length === 10) fetchStats();
+  }, [customerPhone]);
 
   // TC-010 FIX: Input length limiters to prevent overflow/abuse
   const setCustomerName = (v: string | ((prev: string) => string)) => {
@@ -77,11 +86,25 @@ export default function OrderFlow() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [trackedOrderId, setTrackedOrderId] = useState<string | null>(null);
+  const [trackedPickupOtp, setTrackedPickupOtp] = useState<string>('');
+  const [isBlacklisted, setIsBlacklisted] = useState(false);
   const [liveStatus, setLiveStatus] = useState<string>('pending');
   const [showSuccess, setShowSuccess] = useState(false);
   const [orderSummary, setOrderSummary] = useState<any>(null);
   const [isMagicListening, setIsMagicListening] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [initialTranscript, setInitialTranscript] = useState('');
+  const [initialTotalAtSubmission, setInitialTotalAtSubmission] = useState(0);
+  const [deviceId, setDeviceId] = useState('');
+
+  useEffect(() => {
+    let id = localStorage.getItem('orderdo_device_id');
+    if (!id) {
+      id = `DEV-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+      localStorage.setItem('orderdo_device_id', id);
+    }
+    setDeviceId(id);
+  }, []);
 
   useEffect(() => {
     if (pincode.length === 6) {
@@ -124,17 +147,19 @@ export default function OrderFlow() {
       if (parsed.name) setCustomerName(parsed.name);
       if (parsed.address) setCustomerAddress(parsed.address);
       if (parsed.items.length > 0) setItems(parsed.items);
+      setInitialTranscript(transcript);
       if (parsed.name && parsed.items.length > 0) setStep(5);
     };
     rec.onend = () => setIsMagicListening(false);
     rec.start();
   };
 
+  // 1. Fetch Profile
   useEffect(() => {
     if (!shopId) return;
 
-    const fetchMenu = async () => {
-      // 1. Get Shop Profile and Features
+    const fetchProfile = async () => {
+      const urlCode = searchParams.get('code');
       const { data: profileData, error: profileError } = await supabase
         .from('shops_profile')
         .select(`
@@ -155,6 +180,18 @@ export default function OrderFlow() {
       }
 
       if (profileData) {
+        // SEC-002: QR Code Verification (Location Spoofing Prevention)
+        const validCodes = [
+          profileData.master_qr_code,
+          ...(profileData.extraQRs || []).map((ex: any) => ex.code)
+        ].filter(Boolean);
+
+        if (validCodes.length > 0 && !validCodes.includes(urlCode)) {
+          toast.error(language === 'hi' ? 'Galat QR Code! Kripya sahi QR scan karein.' : 'Invalid QR Code! Please scan the official shop QR.');
+          navigate('/');
+          return;
+        }
+
         setProfile({
           id: profileData.id,
           shopId: profileData.shop_id,
@@ -167,40 +204,44 @@ export default function OrderFlow() {
           createdAt: profileData.created_at || new Date().toISOString()
         });
 
-        // Extract features from subscription
         const subFeatures = profileData.features?.[0]?.plans?.features || {};
         setShopFeatures(subFeatures);
-
-        // 2. Fetch Menu from Cloud
-        const { data: items } = await supabase
-          .from('menu_items')
-          .select('*')
-          .eq('shop_id', profileData.id)
-          .eq('available', true);
-
-        if (items) setMenuItems(items as any);
       }
+    };
+
+    fetchProfile();
+  }, [shopId]);
+
+  // 2. Fetch/Subscribe Menu
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    const fetchMenu = async () => {
+      const { data: items } = await supabase
+        .from('menu_items')
+        .select('*')
+        .eq('shop_id', profile.id)
+        .eq('available', true);
+
+      if (items) setMenuItems(items as any);
     };
 
     fetchMenu();
 
-    // 3. Subscribe to Menu Changes (Realtime)
-    if (profile?.id) {
-      const channel = supabase.channel(`menu-updates-${shopId}`)
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'menu_items',
-          filter: `shop_id=eq.${profile.id}`
-        }, () => {
-          fetchMenu();
-        })
-        .subscribe();
+    const channel = supabase.channel(`menu-updates-${shopId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'menu_items',
+        filter: `shop_id=eq.${profile.id}`
+      }, () => {
+        fetchMenu();
+      })
+      .subscribe();
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [shopId, profile?.id]);
 
   const canGoNext = () => {
@@ -211,13 +252,56 @@ export default function OrderFlow() {
     return false;
   };
 
-  const handleSubmitOrder = async (paymentStatus: 'cod' | 'upi') => {
-    if (submitting) return; // TC-031 FIX: Prevent concurrent submission (Double-click protection)
+  const handleSubmitOrder = async (paymentStatus: 'cod' | 'upi', utr?: string) => {
+    if (submitting) return;
+
+    // 1. Anti-Spam Rate Limiting (Global & Per Shop)
+    const now = Date.now();
+    const lastGlobalOrder = localStorage.getItem('last_order_timestamp');
+    const lastShopOrder = localStorage.getItem(`last_order_${shopId}`);
+
+    if (lastGlobalOrder && now - parseInt(lastGlobalOrder) < 30000) {
+      toast.error(language === 'hi' ? 'Kripya thoda intezar karein (30s limit)' : 'Please wait 30s before next order');
+      return;
+    }
+
+    if (lastShopOrder && now - parseInt(lastShopOrder) < 120000) {
+      toast.error(language === 'hi' ? 'Is dukaan ke liye thoda rukien (2m limit)' : 'Please wait 2m for this shop');
+      return;
+    }
+
+    // 1.1 Global Blacklist Check (Device & Phone)
+    const { data: isBlocked } = await supabase
+      .from('blacklisted_devices')
+      .select('id')
+      .eq('device_id', deviceId)
+      .limit(1);
+
+    if (isBlocked && isBlocked.length > 0) {
+      toast.error(language === 'hi' ? 'Aapka device block kar diya gaya hai!' : 'Your device has been blacklisted for suspicious activity!');
+      return;
+    }
+
+    // 2. Duplicate UTR Check (Anti-Fraud)
+    if (paymentStatus === 'upi' && utr && utr.length === 12) {
+      const { data: existingUTR } = await supabase
+        .from('pending_orders')
+        .select('id')
+        .eq('payment_utr', utr)
+        .limit(1);
+
+      if (existingUTR && existingUTR.length > 0) {
+        toast.error(language === 'hi' ? 'Ye UTR pehle use ho chuka hai!' : 'This UTR has already been used!');
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       // TC-030 FIX: Use a more unique short ID (Timestamp + Random)
       const collisionGuard = Date.now().toString(36).toUpperCase().slice(-3);
       const shortId = `ORD-${collisionGuard}${Math.random().toString(36).toUpperCase().slice(2, 5)}`;
+      const pickupOtp = Math.floor(1000 + Math.random() * 9000).toString(); // Secure 4-digit OTP
       const orderId = `order-${crypto.randomUUID()}`;
 
       // Compress photo before upload to save bandwidth and DB space
@@ -237,19 +321,25 @@ export default function OrderFlow() {
         customer_name: encryptedName,
         customer_address: encryptedAddress,
         customer_phone: encryptedPhone,
-        photo_data_url: optimizedPhoto, // Optimized sync for visibility
-        short_id: shortId, // NEW: Human readable ID for both sides
+        photo_data_url: optimizedPhoto,
+        short_id: shortId,
         items,
         status: 'pending',
         type: locationType || undefined,
         no: locationNo || undefined,
         payment_status: paymentStatus,
         payment_received: false,
+        payment_utr: utr, // SEC-003: Store UTR for verification
+        pickup_otp: pickupOtp, // NEW: Secure Verification
+        original_transcript: initialTranscript, // ANTI-FRAUD
+        device_id: deviceId, // ANTI-SPAM
         created_at: new Date().toISOString()
       });
 
       if (!syncError) {
         setTrackedOrderId(orderId);
+        setTrackedPickupOtp(pickupOtp);
+        localStorage.setItem(`last_order_${shopId}`, Date.now().toString());
       } else {
         console.warn('[Sync] Supabase sync failed, using local fallback:', syncError);
       }
@@ -261,7 +351,7 @@ export default function OrderFlow() {
         customerName: encryptedName,
         customerAddress: encryptedAddress,
         customerPhone: encryptedPhone || '',
-        photoDataUrl: optimizedPhoto, 
+        photoDataUrl: optimizedPhoto,
         short_id: shortId, // Store locally too
         items,
         createdAt: Date.now(),
@@ -273,12 +363,16 @@ export default function OrderFlow() {
       });
 
       const total = items.reduce((acc, item) => acc + (item.price || 0), 0);
-      setOrderSummary({ 
-        customerName, 
-        totalAmount: total, 
+      setOrderSummary({
+        customerName,
+        totalAmount: total,
         itemsCount: items.length,
         shortId // Store the short ID for receipt sharing
       });
+      setInitialTotalAtSubmission(total);
+      // Save rate limit
+      localStorage.setItem('last_order_timestamp', Date.now().toString());
+
       setSubmitted(true);
       setShowSuccess(true);
       haptics.success();
@@ -289,328 +383,380 @@ export default function OrderFlow() {
     } finally {
       setSubmitting(false);
     }
-};
+  };
 
-const [prevStatus, setPrevStatus] = useState<string>('pending');
+  const [prevStatus, setPrevStatus] = useState<string>('pending');
 
-// Live Order Tracking Listener & Voice Notifications
-useEffect(() => {
-  if (!trackedOrderId) return;
+  // Live Order Tracking Listener & Voice Notifications
+  useEffect(() => {
+    if (!trackedOrderId) return;
 
-  const channel = supabase.channel(`order-track-${trackedOrderId}`)
-    .on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'pending_orders',
-      filter: `id=eq.${trackedOrderId}`
-    }, (payload) => {
-      if (payload.eventType === 'UPDATE') {
-        const newStatus = payload.new.status;
-        setLiveStatus(newStatus);
+    const channel = supabase.channel(`order-track-${trackedOrderId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'pending_orders',
+        filter: `id=eq.${trackedOrderId}`
+      }, (payload) => {
+        if (payload.eventType === 'UPDATE') {
+          const newStatus = payload.new.status;
+          setLiveStatus(newStatus);
 
-        // Customer Voice Notifications
-        if (newStatus !== prevStatus) {
-          if (newStatus === 'accepted') {
-            speak(v => v.ORDER_ACCEPTED_CUSTOMER);
-          } else if (newStatus === 'ready') {
-            const shortId = `ORD-${trackedOrderId.slice(0, 4).toUpperCase()}`;
-            speak(v => v.ORDER_READY_CUSTOMER(shortId));
-          } else if (newStatus === 'completed') {
+          // Customer Voice Notifications
+          if (newStatus !== prevStatus) {
+            if (newStatus === 'accepted') {
+              speak(v => v.ORDER_ACCEPTED_CUSTOMER);
+            } else if (newStatus === 'ready') {
+              const shortId = `ORD-${trackedOrderId.slice(0, 4).toUpperCase()}`;
+              speak(v => v.ORDER_READY_CUSTOMER(shortId));
+            } else if (newStatus === 'completed') {
+              speak(v => v.ORDER_COMPLETED_CUSTOMER);
+              toast.success(language === 'hi' ? 'Order Poora Ho Gaya!' : 'Order Completed!');
+            }
+            setPrevStatus(newStatus);
+          }
+
+          // Price Update Detection
+          const oldTotal = orderSummary?.totalAmount || 0;
+          const newItems = payload.new.items as OrderItem[];
+          const newTotal = newItems.reduce((acc, item) => acc + (item.price || 0), 0);
+
+          if (newTotal !== oldTotal && oldTotal > 0) {
+            toast.warning(language === 'hi'
+              ? `Savadhaan: Shopkeeper ne price badal diya hai! Naya total: ₹${newTotal}`
+              : `Price Alert: Shopkeeper has updated the price! New total: ₹${newTotal}`, {
+              duration: 6000,
+              icon: <AlertCircle className="text-orange-500" />
+            });
+            setOrderSummary((prev: any) => prev ? { ...prev, totalAmount: newTotal } : null);
+            haptics.warning();
+          }
+        } else if (payload.eventType === 'DELETE') {
+          // Order was completed or removed from cloud.
+          // If it wasn't already accepted/ready, it might have been rejected.
+          if (prevStatus === 'pending') {
+            setLiveStatus('rejected');
+            speak(language === 'hi' ? 'Order asveekaar kar diya gaya hai.' : 'Order has been rejected by the shop.');
+          } else {
+            setLiveStatus('completed');
             speak(v => v.ORDER_COMPLETED_CUSTOMER);
           }
-          setPrevStatus(newStatus);
+          setPrevStatus('completed');
         }
-      } else if (payload.eventType === 'DELETE') {
-        // Order was completed or removed from cloud.
-        // If it wasn't already accepted/ready, it might have been rejected.
-        if (prevStatus === 'pending') {
-          setLiveStatus('rejected');
-          speak(language === 'hi' ? 'Order asveekaar kar diya gaya hai.' : 'Order has been rejected by the shop.');
-        } else {
-          setLiveStatus('completed');
-          speak(v => v.ORDER_COMPLETED_CUSTOMER);
-        }
-        setPrevStatus('completed');
-      }
-    })
-    .subscribe();
+      })
+      .subscribe();
 
-  return () => {
-    supabase.removeChannel(channel);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [trackedOrderId, prevStatus, speak, language]);
+
+  const handleShareReceipt = async () => {
+    if (!orderSummary) return;
+    await generateReceiptCanvas({
+      shopName: profile?.shopName || shopId,
+      customerName,
+      items,
+      total: orderSummary.totalAmount,
+      orderId: orderSummary.shortId, // Use the unified short ID
+      date: new Date().toLocaleString()
+    });
+    const text = `*Order Receipt [${orderSummary.shortId}]*\n*Store:* ${profile?.shopName || shopId}\n*Total:* ₹${orderSummary.totalAmount}\n*Status:* Pending Approval`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
-}, [trackedOrderId, prevStatus, speak, language]);
 
-const handleShareReceipt = async () => {
-  if (!orderSummary) return;
-  await generateReceiptCanvas({
-    shopName: profile?.shopName || shopId,
-    customerName,
-    items,
-    total: orderSummary.totalAmount,
-    orderId: orderSummary.shortId, // Use the unified short ID
-    date: new Date().toLocaleString()
-  });
-  const text = `*Order Receipt [${orderSummary.shortId}]*\n*Store:* ${profile?.shopName || shopId}\n*Total:* ₹${orderSummary.totalAmount}\n*Status:* Pending Approval`;
-  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-};
-
-if (step === 0) {
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 relative">
-      <GlassCard intensity="high" className="w-full max-w-sm p-8 text-center border-white/40 dark:border-white/10">
-        <div className="w-20 h-20 bg-white dark:bg-slate-900 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 shadow-xl p-4 border border-white/20">
-          <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
-        </div>
-
-        <h1 className="text-3xl font-black tracking-tight mb-2">Order-<span className="text-brand-primary">Do</span></h1>
-
-        {shopId ? (
-          <div className="mb-6">
-            <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mb-2">{t('customer.shopHeading')}</p>
-            <div className="inline-block px-4 py-2 bg-brand-primary/10 rounded-full border border-brand-primary/20">
-              <span className="text-brand-primary font-black uppercase italic tracking-tighter">{shopId}</span>
-            </div>
-            {locationType && (
-              <div className="mt-3 flex items-center justify-center gap-2 text-xs font-bold text-slate-400">
-                <div className="w-1.5 h-1.5 rounded-full bg-brand-primary animate-pulse" />
-                {locationType === 'table' ? t('kds.table') : t('kds.counter')} {locationNo}
-              </div>
-            )}
+  if (step === 0) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 relative">
+        <GlassCard intensity="high" className="w-full max-w-sm p-8 text-center border-white/40 dark:border-white/10">
+          <div className="w-20 h-20 bg-white dark:bg-slate-900 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 shadow-xl p-4 border border-white/20">
+            <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
           </div>
-        ) : (
-          <p className="text-red-500 mb-6 font-bold">{t('customer.shopNotFound')}</p>
-        )}
 
-        <p className="text-slate-500 text-sm font-medium mb-8 italic">{t('customer.instruction')}</p>
+          <h1 className="text-3xl font-black tracking-tight mb-2">Order-<span className="text-brand-primary">Do</span></h1>
 
-        <Button
-          variant="primary"
-          size="lg"
-          className="w-full h-16 !rounded-2xl"
-          onClick={() => { setStep(1); speak(language === 'hi' ? 'Chaliye shuru karte hain.' : 'Let’s start.'); }}
-        >
-          {t('customer.startOrder')}
-          <ChevronRight className="ml-2" size={20} />
-        </Button>
+          {shopId ? (
+            <div className="mb-6">
+              <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mb-2">{t('customer.shopHeading')}</p>
+              <div className="inline-block px-4 py-2 bg-brand-primary/10 rounded-full border border-brand-primary/20">
+                <span className="text-brand-primary font-black uppercase italic tracking-tighter">{profile?.shopName || shopId}</span>
+              </div>
+              {profile?.ownerName && (
+                <p className="mt-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Verified Owner: <span className="text-brand-secondary">{profile.ownerName}</span>
+                </p>
+              )}
+              {locationType && (
+                <div className="mt-3 flex items-center justify-center gap-2 text-xs font-bold text-slate-400">
+                  <div className="w-1.5 h-1.5 rounded-full bg-brand-primary animate-pulse" />
+                  {locationType === 'table' ? t('kds.table') : t('kds.counter')} {locationNo}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-red-500 mb-6 font-bold">{t('customer.shopNotFound')}</p>
+          )}
 
-        <div className="mt-8 flex justify-center gap-4">
-          <Link to="/privacy" className="text-[10px] font-black uppercase text-slate-400 tracking-widest hover:text-brand-primary transition-colors">Privacy</Link>
-          <Link to="/terms" className="text-[10px] font-black uppercase text-slate-400 tracking-widest hover:text-brand-secondary transition-colors">Terms</Link>
-        </div>
-      </GlassCard>
-    </div>
-  );
-}
+          <p className="text-slate-500 text-sm font-medium mb-8 italic">{t('customer.instruction')}</p>
 
-return (
-  <div className="min-h-screen flex flex-col">
-    {/* Premium Navigation & Progress */}
-    <div className="fixed top-0 left-0 right-0 z-50 bg-white/20 dark:bg-slate-900/20 backdrop-blur-3xl border-b border-white/10 p-4">
-      <div className="max-w-2xl mx-auto flex items-center gap-4">
-        {!submitted && step > 1 && (
-          <Button variant="ghost" size="sm" className="!p-0 w-10 h-10 rounded-full" onClick={() => setStep(s => s - 1)}>
-            <ArrowLeft size={18} />
+          <Button
+            variant="primary"
+            size="lg"
+            className="w-full h-16 !rounded-2xl"
+            onClick={() => { setStep(1); speak(language === 'hi' ? 'Chaliye shuru karte hain.' : 'Let’s start.'); }}
+          >
+            {t('customer.startOrder')}
+            <ChevronRight className="ml-2" size={20} />
           </Button>
-        )}
 
-        {/* Liquid Progress Dots */}
-        <div className="flex-1 flex justify-between items-center relative gap-2">
-          {getSteps(t).map((s, idx) => (
-            <div key={s.id} className="flex-1 flex items-center gap-2">
-              <div className={`
+          <div className="mt-8 flex justify-center gap-4">
+            <Link to="/privacy" className="text-[10px] font-black uppercase text-slate-400 tracking-widest hover:text-brand-primary transition-colors">Privacy</Link>
+            <Link to="/terms" className="text-[10px] font-black uppercase text-slate-400 tracking-widest hover:text-brand-secondary transition-colors">Terms</Link>
+          </div>
+        </GlassCard>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      {/* Premium Navigation & Progress */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-white/20 dark:bg-slate-900/20 backdrop-blur-3xl border-b border-white/10 p-4">
+        <div className="max-w-2xl mx-auto flex items-center gap-4">
+          {!submitted && step > 1 && (
+            <Button variant="ghost" size="sm" className="!p-0 w-10 h-10 rounded-full" onClick={() => setStep(s => s - 1)}>
+              <ArrowLeft size={18} />
+            </Button>
+          )}
+
+          {/* Liquid Progress Dots */}
+          <div className="flex-1 flex justify-between items-center relative gap-2">
+            {getSteps(t).map((s, idx) => (
+              <div key={s.id} className="flex-1 flex items-center gap-2">
+                <div className={`
                   w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-black transition-all duration-500
                   ${step >= s.id ? 'bg-brand-primary text-white shadow-glow-green scale-110' : 'bg-white/40 dark:bg-slate-800/40 text-slate-400 border border-white/10'}
                 `}>
-                {step > s.id ? '✓' : s.id}
+                  {step > s.id ? '✓' : s.id}
+                </div>
+                {idx < getSteps(t).length - 1 && (
+                  <div className={`flex-1 h-[2px] rounded-full ${step > s.id ? 'bg-brand-primary' : 'bg-slate-200 dark:bg-slate-800'}`} />
+                )}
               </div>
-              {idx < getSteps(t).length - 1 && (
-                <div className={`flex-1 h-[2px] rounded-full ${step > s.id ? 'bg-brand-primary' : 'bg-slate-200 dark:bg-slate-800'}`} />
-              )}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
 
-        <div className="flex gap-2">
-          <Button variant="ghost" size="sm" className="!p-0 w-10 h-10 rounded-full text-brand-primary" onClick={() => setShowTutorial(true)}>
-            <HelpCircle size={18} />
-          </Button>
-          <Button variant="ghost" size="sm" className="!p-0 w-10 h-10 rounded-full" onClick={toggleTheme}>
-            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" className="!p-0 w-10 h-10 rounded-full text-brand-primary" onClick={() => setShowTutorial(true)}>
+              <HelpCircle size={18} />
+            </Button>
+            <Button variant="ghost" size="sm" className="!p-0 w-10 h-10 rounded-full" onClick={toggleTheme}>
+              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            </Button>
+          </div>
         </div>
       </div>
-    </div>
 
-    {/* Main Flow Area */}
-    <div className="flex-1 pt-24 pb-32 px-6">
-      <div className="max-w-md mx-auto h-full">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={step}
-            initial={{ x: 20, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -20, opacity: 0 }}
-            className="h-full"
-          >
-            <GlassCard intensity="medium" className="p-1 overflow-hidden">
-              {/* Step Header */}
-              <div className="p-6 pb-2">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={`p-3 rounded-2xl ${step === 1 ? 'bg-blue-500/10 text-blue-500' : step === 2 ? 'bg-brand-secondary/10 text-brand-secondary' : 'bg-brand-primary/10 text-brand-primary'}`}>
-                    {getSteps(t)[step - 1].icon && <IconComponent icon={getSteps(t)[step - 1].icon} />}
-                  </div>
-                  <div>
-                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{t(`customer.steps.${['photo', 'name', 'address', 'items', 'preview'][step - 1]}`)}</h4>
-                    <h2 className="text-xl font-black text-slate-900 dark:text-white">{t(`customer.step${step}Title`)}</h2>
+      {/* Main Flow Area */}
+      <div className="flex-1 pt-24 pb-32 px-6">
+        <div className="max-w-md mx-auto h-full">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={step}
+              initial={{ x: 20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -20, opacity: 0 }}
+              className="h-full"
+            >
+              <GlassCard intensity="medium" className="p-1 overflow-hidden">
+                {/* Step Header */}
+                <div className="p-6 pb-2">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className={`p-3 rounded-2xl ${step === 1 ? 'bg-blue-500/10 text-blue-500' : step === 2 ? 'bg-brand-secondary/10 text-brand-secondary' : 'bg-brand-primary/10 text-brand-primary'}`}>
+                      {getSteps(t)[step - 1].icon && <IconComponent icon={getSteps(t)[step - 1].icon} />}
+                    </div>
+                    <div>
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{t(`customer.steps.${['photo', 'name', 'address', 'items', 'preview'][step - 1]}`)}</h4>
+                      <h2 className="text-xl font-black text-slate-900 dark:text-white">{t(`customer.step${step}Title`)}</h2>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="p-6 pt-0 space-y-6">
-                {step === 1 && <CameraCapture shopId={shopId} onCapture={setPhoto} />}
-                {step === 2 && (
-                  <div className="space-y-6">
-                    <VoiceNameInput onNameSet={setCustomerName} />
-                    <Input
-                      label="Phone Number"
-                      placeholder="9876543210"
-                      maxLength={10}
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, ''))}
-                      icon={<span className="text-[10px] font-black">+91</span>}
-                    />
-                  </div>
-                )}
-                {step === 3 && (
-                  <div className="space-y-6">
-                    <Input
-                      label="Pin Code"
-                      placeholder="110001"
-                      maxLength={6}
-                      value={pincode}
-                      onChange={(e) => setPincode(e.target.value.replace(/\D/g, ''))}
-                      className="text-center text-xl tracking-[0.5em] font-black"
-                    />
-                    <VoiceAddressInput onAddressSet={setCustomerAddress} initialValue={customerAddress} />
-                  </div>
-                )}
-                {step === 4 && (
-                  <div className="space-y-6">
-                    <div className="flex flex-wrap gap-2 max-h-[30vh] overflow-y-auto pr-2 custom-scrollbar">
-                      {menuItems.length > 0 ? (
-                        menuItems.map(mi => (
-                          <button
-                            key={mi.id}
-                            onClick={() => setItems([...items, { name: mi.name, quantity: '1', price: mi.price }])}
-                            className="px-3 py-2 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-xl text-xs font-bold hover:bg-brand-primary hover:text-white transition-all active:scale-95"
-                          >
-                            {mi.name} · ₹{mi.price}
-                          </button>
-                        ))
-                      ) : (
-                        <div className="w-full py-6 px-4 bg-amber-500/5 border border-dashed border-amber-500/20 rounded-2xl text-center">
-                           <p className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-1">
-                             {language === 'hi' ? 'मेनू खाली है' : 'Menu is Empty'}
-                           </p>
-                           <p className="text-[10px] text-slate-500 font-bold leading-relaxed">
-                             {language === 'hi' 
-                               ? 'मेनू अभी अपडेट हो रहा है! आप नीचे दिए गए माइक बटन से बोल कर अपना ऑर्डर दे सकते हैं।' 
-                               : 'Menu is being updated! You can still use the magic microphone below to place your order.'}
-                           </p>
-                        </div>
-                      )}
+                <div className="p-6 pt-0 space-y-6">
+                  {step === 1 && <CameraCapture shopId={shopId} onCapture={setPhoto} />}
+                  {step === 2 && (
+                    <div className="space-y-6">
+                      <VoiceNameInput onNameSet={setCustomerName} />
+                      <Input
+                        label="Phone Number"
+                        placeholder="9876543210"
+                        maxLength={10}
+                        value={customerPhone}
+                        onChange={async (e) => {
+                          const val = e.target.value.replace(/\D/g, '');
+                          setCustomerPhone(val);
+                          if (val.length === 10) {
+                            const { data } = await supabase.from('blacklisted_customers').select('phone_number').eq('phone_number', val).single();
+                            setIsBlacklisted(!!data);
+                            if (data) toast.error(language === 'hi' ? 'Ye number blacklisted hai! COD available nahi hoga.' : 'This number is blacklisted! COD will be disabled.');
+                          }
+                        }}
+                        icon={<span className="text-[10px] font-black">+91</span>}
+                      />
                     </div>
-                    <VoiceItemList items={items} onItemsChange={setItems} />
-                  </div>
-                )}
-                {step === 5 && (
-                  <OrderPreview
-                    photo={photo}
-                    customerName={customerName}
-                    customerAddress={customerAddress}
-                    items={items}
-                    shopId={shopId}
-                    shopName={profile?.shopName || shopId}
-                    upiId={profile?.upiId}
-                    onSubmit={handleSubmitOrder}
-                    submitting={submitting}
-                    submitted={submitted}
-                  />
-                )}
-              </div>
-            </GlassCard>
-          </motion.div>
-        </AnimatePresence>
-      </div>
-    </div>
-
-    {/* Floating Bottom Navigation */}
-    {step < 5 && !submitted && (
-      <div className="fixed bottom-0 left-0 right-0 p-6 z-40 bg-gradient-to-t from-white dark:from-slate-950 to-transparent">
-        <div className="max-w-md mx-auto">
-          <Button
-            disabled={!canGoNext()}
-            onClick={() => setStep(s => s + 1)}
-            className="w-full h-16 shadow-glow-green"
-            size="lg"
-          >
-            {t('common.next')}
-            <ArrowRight className="ml-2" size={20} />
-          </Button>
+                  )}
+                  {step === 3 && (
+                    <div className="space-y-6">
+                      <Input
+                        label="Pin Code"
+                        placeholder="110001"
+                        maxLength={6}
+                        value={pincode}
+                        onChange={(e) => setPincode(e.target.value.replace(/\D/g, ''))}
+                        className="text-center text-xl tracking-[0.5em] font-black"
+                      />
+                      <VoiceAddressInput onAddressSet={setCustomerAddress} initialValue={customerAddress} />
+                    </div>
+                  )}
+                  {step === 4 && (
+                    <div className="space-y-6">
+                      <div className="flex flex-wrap gap-2 max-h-[30vh] overflow-y-auto pr-2 custom-scrollbar">
+                        {menuItems.length > 0 ? (
+                          menuItems.map(mi => (
+                            <button
+                              key={mi.id}
+                              onClick={() => setItems([...items, { name: mi.name, quantity: '1', price: mi.price, originalPrice: mi.price }])}
+                              className="px-3 py-2 bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-xl text-xs font-bold hover:bg-brand-primary hover:text-white transition-all active:scale-95"
+                            >
+                              {mi.name} · ₹{mi.price}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="w-full py-6 px-4 bg-amber-500/5 border border-dashed border-amber-500/20 rounded-2xl text-center">
+                            <p className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-1">
+                              {language === 'hi' ? 'मेनू खाली है' : 'Menu is Empty'}
+                            </p>
+                            <p className="text-[10px] text-slate-500 font-bold leading-relaxed">
+                              {language === 'hi'
+                                ? 'मेनू अभी अपडेट हो रहा है! आप नीचे दिए गए माइक बटन से बोल कर अपना ऑर्डर दे सकते हैं।'
+                                : 'Menu is being updated! You can still use the magic microphone below to place your order.'}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      <VoiceItemList items={items} onItemsChange={setItems} />
+                    </div>
+                  )}
+                  {step === 5 && (
+                    <OrderPreview
+                      photo={photo}
+                      customerName={customerName}
+                      customerAddress={customerAddress}
+                      items={items}
+                      shopId={shopId}
+                      shopName={profile?.shopName || shopId}
+                      upiId={profile?.upiId}
+                      onSubmit={handleSubmitOrder}
+                      submitting={submitting}
+                      submitted={submitted}
+                      disableCOD={isBlacklisted || (items.reduce((acc, i) => acc + (i.price || 0), 0) > 200 && customerOrderCount === 0)}
+                    />
+                  )}
+                </div>
+              </GlassCard>
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
-    )}
 
-    {/* Magic AI MIC Orb */}
-    {!submitted && step >= 1 && step < 5 && (
-      <div className="fixed bottom-28 right-6 z-50">
-        <motion.button
-          whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-          onClick={handleMagicOrder}
-          className={`
+      {/* Floating Bottom Navigation */}
+      {step < 5 && !submitted && (
+        <div className="fixed bottom-0 left-0 right-0 p-6 z-40 bg-gradient-to-t from-white dark:from-slate-950 to-transparent">
+          <div className="max-w-md mx-auto">
+            <Button
+              disabled={!canGoNext()}
+              onClick={() => setStep(s => s + 1)}
+              className="w-full h-16 shadow-glow-green"
+              size="lg"
+            >
+              {t('common.next')}
+              <ArrowRight className="ml-2" size={20} />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Magic AI MIC Orb */}
+      {!submitted && step >= 1 && step < 5 && (
+        <div className="fixed bottom-28 right-6 z-50">
+          <motion.button
+            whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+            onClick={handleMagicOrder}
+            className={`
               relative w-16 h-16 rounded-full flex items-center justify-center shadow-2xl overflow-hidden
               ${isMagicListening ? 'bg-red-500' : 'bg-slate-950'}
             `}
-        >
-          {isMagicListening ? (
-            <motion.div animate={{ scale: [1, 2, 1], opacity: [0.5, 0.2, 0.5] }} transition={{ repeat: Infinity }} className="absolute inset-0 bg-red-400 rounded-full" />
-          ) : (
-            <motion.div animate={{ rotate: 360 }} transition={{ duration: 4, repeat: Infinity, ease: 'linear' }} className="absolute inset-0 bg-gradient-to-br from-brand-primary via-brand-secondary to-brand-primary opacity-40 blur-sm" />
-          )}
-          <Mic className="text-white relative z-10" size={24} />
-        </motion.button>
+          >
+            {isMagicListening ? (
+              <motion.div animate={{ scale: [1, 2, 1], opacity: [0.5, 0.2, 0.5] }} transition={{ repeat: Infinity }} className="absolute inset-0 bg-red-400 rounded-full" />
+            ) : (
+              <motion.div animate={{ rotate: 360 }} transition={{ duration: 4, repeat: Infinity, ease: 'linear' }} className="absolute inset-0 bg-gradient-to-br from-brand-primary via-brand-secondary to-brand-primary opacity-40 blur-sm" />
+            )}
+            <Mic className="text-white relative z-10" size={24} />
+          </motion.button>
 
-        <AnimatePresence>
-          {!isMagicListening && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
-              className="absolute right-20 top-1/2 -translate-y-1/2 px-4 py-2 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-2xl whitespace-nowrap shadow-xl border border-white/10"
-            >
-              AI Magic Order
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    )}
+          <AnimatePresence>
+            {!isMagicListening && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+                className="absolute right-20 top-1/2 -translate-y-1/2 px-4 py-2 bg-black text-white text-[10px] font-black uppercase tracking-widest rounded-2xl whitespace-nowrap shadow-xl border border-white/10"
+              >
+                AI Magic Order
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
 
-    {submitted && <SuccessModal
-      isOpen={showSuccess}
-      onClose={() => navigate('/')}
-      shopId={shopId}
-      shopUUID={profile?.id}
-      orderId={trackedOrderId || ''}
-      orderSummary={orderSummary}
-      onShareReceipt={handleShareReceipt}
-      orderStatus={liveStatus}
-      feedbackEnabled={shopFeatures.magic_feedback}
-    />}
-    {submitted && <Confetti />}
-    <VisualTutorial 
-      isOpen={showTutorial}
-      onClose={() => setShowTutorial(false)}
-    />
-  </div>
-);
+      {submitted && <SuccessModal
+        isOpen={showSuccess}
+        onClose={() => navigate('/')}
+        shopId={shopId}
+        shopUUID={profile?.id}
+        orderId={trackedOrderId || ''}
+        orderSummary={orderSummary}
+        onShareReceipt={handleShareReceipt}
+        orderStatus={liveStatus}
+        feedbackEnabled={shopFeatures.magic_feedback}
+        pickupOtp={trackedPickupOtp}
+        originalTranscript={initialTranscript}
+        initialTotal={initialTotalAtSubmission}
+        onConfirmPickup={async () => {
+          if (!trackedOrderId) return;
+          await supabase.from('pending_orders').update({ status: 'completed' }).eq('id', trackedOrderId);
+          setLiveStatus('completed');
+          haptics.success();
+        }}
+        onDispute={async (reason, screenshot) => {
+          if (!trackedOrderId || !profile) return;
+          await supabase.from('disputes').insert({
+            order_id: trackedOrderId,
+            shop_id: shopId,
+            customer_name: customerName,
+            payment_utr: orderSummary?.totalAmount.toString(), // Simplified for now
+            reason,
+            screenshot_url: screenshot
+          });
+          toast.success(language === 'hi' ? 'Shikayat darj kar di gayi hai.' : 'Dispute has been registered.');
+        }}
+      />}
+      {submitted && <Confetti />}
+      <VisualTutorial
+        isOpen={showTutorial}
+        onClose={() => setShowTutorial(false)}
+      />
+    </div>
+  );
 }
 
 function IconComponent({ icon: Icon }: { icon: any }) {

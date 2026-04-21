@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import type { PendingOrder, OrderItem } from '../../db/dexie';
 import { X, User, CheckCircle, XCircle, Volume2, IndianRupee, Banknote, QrCode, CheckCircle2, AlertCircle, ShieldCheck, ShieldAlert, Lock, UtensilsCrossed, Sparkles } from 'lucide-react';
 import { useVoice } from '../../context/VoiceContext';
@@ -8,6 +8,15 @@ import SecureCanvas from '../ui/SecureCanvas';
 import Button from '../ui/Button';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { toast } from 'sonner';
+import { supabase } from '../../lib/supabase';
+// Custom debounce for build stability
+function debounce(fn: Function, ms: number) {
+  let timeoutId: any;
+  return function(this: any, ...args: any[]) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn.apply(this, args), ms);
+  };
+}
 
 interface OrderModalProps {
   order: PendingOrder;
@@ -25,11 +34,13 @@ export default function OrderModal({ order, onClose, onDone, onReject, onUpdateS
   const { announceOrder: voiceAnnounce } = useVoice();
   // Local copy of items with prices
   const [pricedItems, setPricedItems] = useState<OrderItem[]>(
-    order.items.map((i) => ({ ...i, price: i.price ?? 0 }))
+    order.items.map((i) => ({ ...i, price: i.price ?? 0, originalPrice: i.originalPrice ?? i.price }))
   );
   const [paymentReceived, setPaymentReceived] = useState(order.paymentReceived || false);
   const [processing, setProcessing] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
+  const [otpInput, setOtpInput] = useState('');
+  const [showOtpError, setShowOtpError] = useState(false);
   const { t, language } = useLanguage();
   useAntiCapture(true);
 
@@ -80,12 +91,41 @@ export default function OrderModal({ order, onClose, onDone, onReject, onUpdateS
   );
 
   const updatePrice = (idx: number, price: number) => {
-    setPricedItems((prev) =>
-      prev.map((item, i) => (i === idx ? { ...item, price } : item))
-    );
+    const updated = pricedItems.map((item, i) => (i === idx ? { ...item, price } : item));
+    setPricedItems(updated);
+    
+    // Sync price update to Supabase so customer gets real-time alert
+    syncPriceToCloud(updated);
+  };
+
+  // Debounced cloud sync
+  const syncPriceToCloud = useCallback(
+    debounce(async (items: OrderItem[]) => {
+      try {
+        await supabase
+          .from('pending_orders')
+          .update({ items })
+          .eq('id', order.id);
+      } catch (err) {
+        console.warn('[OrderModal] Price sync failed:', err);
+      }
+    }, 1000),
+    [order.id]
+  );
+
+  const resetToOriginal = (idx: number) => {
+    const updated = pricedItems.map((item, i) => (i === idx ? { ...item, price: item.originalPrice ?? item.price ?? 0 } : item));
+    setPricedItems(updated);
+    syncPriceToCloud(updated);
+    toast.success(language === 'hi' ? 'Menu price wapas set ho gaya!' : 'Reset to menu price!');
   };
 
   const handleDone = async () => {
+    if (otpInput !== (order as any).pickup_otp) {
+      setShowOtpError(true);
+      toast.error(language === 'hi' ? 'Galat OTP! Kripya grahak se sahi OTP lein.' : 'Invalid OTP! Please get the correct OTP from the customer.');
+      return;
+    }
     setProcessing(true);
     await onDone(order, pricedItems, total, paymentReceived);
     setProcessing(false);
@@ -105,7 +145,12 @@ export default function OrderModal({ order, onClose, onDone, onReject, onUpdateS
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100 dark:border-slate-700 shrink-0">
-          <h3 className="text-lg font-bold text-slate-800 dark:text-white">{t('orders.title')}</h3>
+          <div className="flex flex-col">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-white">{t('orders.title')}</h3>
+            {(order as any).original_transcript && (
+              <p className="text-[9px] font-bold text-slate-400 italic">"{(order as any).original_transcript}"</p>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => voiceAnnounce(customerName, order.items, order.short_id || order.id, order.type || undefined, order.no || undefined)}
@@ -206,8 +251,15 @@ export default function OrderModal({ order, onClose, onDone, onReject, onUpdateS
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('customer.paymentStatus')}</span>
                 <div className="flex items-center gap-2 mt-1">
                   {order.paymentStatus === 'upi' ? (
-                    <div className="flex items-center gap-1.5 text-blue-500 font-bold text-sm">
-                      <QrCode size={16} /> {t('customer.payUPI')}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-1.5 text-blue-500 font-bold text-sm">
+                        <QrCode size={16} /> {t('customer.payUPI')}
+                      </div>
+                      {(order as any).payment_utr && (
+                        <div className="flex items-center gap-1 text-[9px] font-black font-mono text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                          UTR: {(order as any).payment_utr}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="flex items-center gap-1.5 text-amber-600 font-bold text-sm">
@@ -291,19 +343,62 @@ export default function OrderModal({ order, onClose, onDone, onReject, onUpdateS
                   <SecureCanvas content={item.name} width={180} height={24} fontSize={14} className="border-none bg-transparent" />
                 </div>
                 <span className="text-xs text-slate-400 font-black">{item.quantity}</span>
-                <div className="relative">
-                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">₹</span>
+                <div className="relative group/price">
+                  <span className={`absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold transition-colors ${item.price !== item.originalPrice && item.originalPrice !== undefined ? 'text-orange-500' : 'text-slate-400'}`}>₹</span>
                   <input
                     type="number"
                     min="0"
                     value={item.price || ''}
                     onChange={(e) => updatePrice(idx, parseFloat(e.target.value) || 0)}
                     placeholder="0"
-                    className="w-full text-right text-sm font-black font-mono pl-5 pr-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white focus:border-kirana-green focus:outline-none focus:ring-1 focus:ring-kirana-green/30"
+                    className={`w-full text-right text-sm font-black font-mono pl-5 pr-2 py-1.5 rounded-lg border transition-all focus:outline-none focus:ring-1 ${
+                      item.price !== item.originalPrice && item.originalPrice !== undefined
+                        ? 'border-orange-500 bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 focus:ring-orange-500/30'
+                        : 'border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white focus:border-kirana-green focus:ring-kirana-green/30'
+                    }`}
                   />
+                  {item.price !== item.originalPrice && item.originalPrice !== undefined && (
+                    <button 
+                      onClick={() => resetToOriginal(idx)}
+                      className="absolute -top-4 right-0 text-[8px] font-black text-orange-500 uppercase tracking-widest hover:underline animate-bounce"
+                    >
+                      Reset to ₹{item.originalPrice}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
+            {pricedItems.some(i => i.price !== i.originalPrice) && (
+              <div className="p-3 bg-red-50 dark:bg-red-500/10 border-t border-red-100 dark:border-red-500/20 flex items-center gap-2">
+                <AlertCircle size={14} className="text-red-500" />
+                <p className="text-[10px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest">
+                  Caution: You are billing different from menu prices. This is logged.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Secure OTP Verification */}
+          <div className="bg-slate-900 text-white p-5 rounded-3xl border-2 border-brand-primary/30 shadow-xl relative overflow-hidden">
+             <div className="absolute top-0 right-0 p-2 opacity-10">
+                <Lock size={40} />
+             </div>
+             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-primary mb-3 flex items-center gap-2">
+                <ShieldCheck size={12} /> Secure Pickup OTP
+             </p>
+             <div className="flex gap-4 items-center">
+                <input 
+                  type="text" 
+                  maxLength={4}
+                  value={otpInput}
+                  onChange={(e) => { setOtpInput(e.target.value.replace(/\D/g, '')); setShowOtpError(false); }}
+                  placeholder="0000"
+                  className={`w-32 bg-white/10 border-2 rounded-2xl py-3 px-4 text-center text-2xl font-black tracking-[0.5em] focus:outline-none transition-all ${showOtpError ? 'border-red-500 animate-shake' : 'border-white/20 focus:border-brand-primary'}`}
+                />
+                <div className="flex-1 text-[9px] font-bold text-slate-400 leading-tight italic">
+                  Ask the customer for the 4-digit code shown on their success screen.
+                </div>
+             </div>
           </div>
 
           {/* Total */}

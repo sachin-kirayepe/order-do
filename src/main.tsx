@@ -5,26 +5,7 @@ import './index.css'
 import App from './App.tsx'
 import { cleanupStaleOrders } from './utils/cleanup'
 
-// BRUTAL CACHE PURGE & SW UNREGISTER
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(function(registrations) {
-    for(const registration of registrations) {
-      registration.unregister();
-      console.log('[SW] FORCED UNREGISTER:', registration.scope);
-    }
-  });
-}
-
-// Ensure the browser fetches fresh files
-if (!sessionStorage.getItem('cache_purged_v2')) {
-  sessionStorage.setItem('cache_purged_v2', 'true');
-  localStorage.clear();
-  caches.keys().then((names) => {
-    names.forEach(name => caches.delete(name));
-  });
-  console.log('[SYSTEM] Cache purged, reloading...');
-  setTimeout(() => window.location.reload(), 500);
-}
+// SYSTEM STABILIZED: Cache management handled via PWA versioning, not brutal purges.
 
 // Auto-cleanup stale orders on startup
 cleanupStaleOrders();

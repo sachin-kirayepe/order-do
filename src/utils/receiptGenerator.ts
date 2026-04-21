@@ -73,11 +73,15 @@ export async function generateReceiptCanvas(data: ReceiptData): Promise<string> 
   // Items List
   let currentY = 175;
   ctx.fillStyle = '#1e293b';
-  ctx.font = '14px sans-serif';
+  // Enhanced font stack for Hindi support
+  ctx.font = '14px "Noto Sans Devanagari", "Inter", sans-serif';
   
   data.items.forEach((item) => {
     ctx.textAlign = 'left';
-    ctx.fillText(item.name, padding, currentY);
+    // Truncate long item names to prevent overlap
+    const displayName = item.name.length > 30 ? item.name.slice(0, 27) + '...' : item.name;
+    ctx.fillText(displayName, padding, currentY);
+    
     ctx.textAlign = 'right';
     ctx.fillText(item.quantity, width - padding - 60, currentY);
     if (item.price) {
@@ -97,7 +101,7 @@ export async function generateReceiptCanvas(data: ReceiptData): Promise<string> 
 
   // Total
   ctx.fillStyle = '#0f172a';
-  ctx.font = 'bold 20px sans-serif';
+  ctx.font = 'bold 20px "Inter", sans-serif';
   ctx.textAlign = 'left';
   ctx.fillText('TOTAL:', padding, currentY + 45);
   ctx.textAlign = 'right';
@@ -105,7 +109,7 @@ export async function generateReceiptCanvas(data: ReceiptData): Promise<string> 
 
   // Branding
   ctx.fillStyle = '#059669';
-  ctx.font = 'italic bold 12px sans-serif';
+  ctx.font = 'italic bold 12px "Inter", sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText('Ordered via Order-Do App', width / 2, totalHeight - 30);
 
