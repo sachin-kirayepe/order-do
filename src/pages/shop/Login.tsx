@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, KeyRound, Shield, Eye, EyeOff, Sparkles, Fingerprint, Lock, Zap, ArrowRight, ArrowLeft, Phone } from 'lucide-react';
+import { Mail, KeyRound, Shield, Eye, EyeOff, Sparkles, Fingerprint, Lock, Zap, ArrowLeft, Phone } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import LanguageSwitcher from '../../components/ui/LanguageSwitcher';
 import { useAuth } from '../../context/AuthContext';

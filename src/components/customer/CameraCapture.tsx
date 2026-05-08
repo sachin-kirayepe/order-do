@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { Camera, RefreshCcw, CheckCircle, Eye, Volume2, Info, AlertTriangle, Zap } from 'lucide-react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { RefreshCcw, CheckCircle, Eye, Volume2, Info, AlertTriangle, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../ui/Button';
 import { compressPhoto } from '../../utils/compress';
