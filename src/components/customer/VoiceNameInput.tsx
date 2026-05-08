@@ -99,9 +99,7 @@ export default function VoiceNameInput({ onNameSet }: VoiceNameInputProps) {
 
   return (
     <div className="flex flex-col items-center gap-5">
-      <h2 className="text-xl font-bold text-slate-800 dark:text-white text-center">
-        {t('customer.step2Title')}
-      </h2>
+      {/* Header handled by OrderFlow */}
 
       {/* Mode Toggle */}
       <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1 w-full max-w-xs">
@@ -123,13 +121,13 @@ export default function VoiceNameInput({ onNameSet }: VoiceNameInputProps) {
         <div className="flex flex-col items-center gap-4">
           <button
             onClick={listening ? stopListening : startListening}
-            className={`w-28 h-28 rounded-full flex items-center justify-center text-white shadow-xl transition-all active:scale-95 ${
+            className={`w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center text-white shadow-xl transition-all active:scale-95 ${
               listening
                 ? 'bg-red-500 animate-pulse scale-110'
                 : 'bg-kirana-green hover:bg-kirana-dark'
             }`}
           >
-            {listening ? <MicOff size={44} /> : <Mic size={44} />}
+            {listening ? <MicOff className="w-8 h-8 md:w-10 md:h-10" /> : <Mic className="w-8 h-8 md:w-10 md:h-10" />}
           </button>
           <p className="text-sm text-slate-500">
             {listening ? t('customer.listening') : t('customer.voiceInstruction')}

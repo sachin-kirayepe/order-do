@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, KeyRound, Shield, Eye, EyeOff, Sparkles, Fingerprint, Lock, Zap, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Mail, KeyRound, Shield, Eye, EyeOff, Sparkles, Fingerprint, Lock, Zap, ArrowRight, ArrowLeft, Phone } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import LanguageSwitcher from '../../components/ui/LanguageSwitcher';
 import { useAuth } from '../../context/AuthContext';
@@ -11,10 +11,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import GlassCard from '../../components/ui/GlassCard';
 
 export default function Login() {
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
-  const [tab, setTab] = useState<'magic' | 'otp' | 'password'>('magic');
+  const [tab, setTab] = useState<'phone' | 'admin'>('phone');
   const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [error, setError] = useState('');
@@ -23,17 +24,14 @@ export default function Login() {
   const { t } = useLanguage();
   const { isAdmin, user } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
-  // TC-021 FIX: OTP cooldown state
   const [otpCooldown, setOtpCooldown] = useState(0);
 
-  // TC-021: Cooldown timer
   useEffect(() => {
     if (otpCooldown <= 0) return;
     const timer = setTimeout(() => setOtpCooldown(prev => prev - 1), 1000);
     return () => clearTimeout(timer);
   }, [otpCooldown]);
 
-  // TC-031 FIX: Auto-redirect admin on auth state change (magic link flow)
   useEffect(() => {
     if (user && isAdmin) {
       navigate('/admin');
@@ -42,46 +40,45 @@ export default function Login() {
     }
   }, [user, isAdmin, navigate]);
 
-  const handleSendMagicLink = async () => {
-    if (otpCooldown > 0) return;
-    setLoading(true); setError(''); setMessage('');
-    const { error } = await supabase.auth.signInWithOtp({ 
-      email,
-      options: {
-        emailRedirectTo: window.location.origin
-      }
-    });
-    if (error) setError(error.message);
-    else {
-      setMessage(t('auth.magicLinkSent'));
-      setOtpCooldown(60); // TC-021: 60 second cooldown
-    }
-    setLoading(false);
-  };
-
   const handleSendOTP = async () => {
+    if (!phone || phone.length < 10) {
+      setError('Please enter a valid 10-digit mobile number');
+      return;
+    }
     if (otpCooldown > 0) return;
+    
     setLoading(true); setError(''); setMessage('');
-    const { error } = await supabase.auth.signInWithOtp({ email });
+    const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
+
+    const { error } = await supabase.auth.signInWithOtp({ phone: formattedPhone });
     if (error) setError(error.message);
     else {
       setOtpSent(true);
-      setMessage(t('auth.otpSent'));
-      setOtpCooldown(60); // TC-021: 60 second cooldown
+      setMessage(t('auth.otpSent') || 'OTP sent successfully');
+      setOtpCooldown(60);
     }
     setLoading(false);
   };
 
   const handleVerifyOTP = async () => {
+    if (!otp || otp.length !== 6) {
+      setError('Please enter a valid 6-digit OTP');
+      return;
+    }
+
     setLoading(true); setError('');
-    const { data, error } = await supabase.auth.verifyOtp({ email, token: otp, type: 'email' });
+    const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
+
+    const { data, error } = await supabase.auth.verifyOtp({ phone: formattedPhone, token: otp, type: 'sms' });
     if (error) setError(error.message);
     else if (data.session?.user) {
-      const { data: roleData } = await supabase.from('shops_profile').select('role').eq('id', data.session.user.id).single();
+      const { data: roleData } = await supabase.from('shops_profile').select('role, shop_id').eq('id', data.session.user.id).single();
       if (roleData?.role === 'admin') {
         navigate('/admin');
-      } else {
+      } else if (roleData?.shop_id) {
         navigate('/shop/dashboard');
+      } else {
+        navigate('/shop/setup');
       }
     }
     setLoading(false);
@@ -92,11 +89,12 @@ export default function Login() {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) setError(error.message);
     else if (data.user) {
-      const { data: roleData } = await supabase.from('shops_profile').select('role').eq('id', data.user.id).single();
+      const { data: roleData } = await supabase.from('shops_profile').select('role, shop_id').eq('id', data.user.id).single();
       if (roleData?.role === 'admin') {
         navigate('/admin');
       } else {
-        navigate('/shop/dashboard');
+        setError('Not authorized for Admin access');
+        await supabase.auth.signOut();
       }
     }
     setLoading(false);
@@ -104,7 +102,6 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden bg-slate-950">
-      {/* Immersive Background Nodes */}
       <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-brand-primary/10 blur-[120px] rounded-full -mr-40 -mt-40 animate-pulse-slow" />
       <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-brand-secondary/10 blur-[120px] rounded-full -ml-40 -mb-40 animate-pulse-slow" />
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-[0.03] pointer-events-none" />
@@ -140,17 +137,13 @@ export default function Login() {
           
           <div className="flex p-1.5 bg-white/40 dark:bg-slate-950/40 backdrop-blur-xl border border-white/20 dark:border-white/5 rounded-2xl shadow-inner mb-8">
             <button 
-              className={`flex-1 py-3 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${tab === 'magic' ? 'bg-brand-primary text-white shadow-glow-green' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}
-              onClick={() => { setTab('magic'); setOtpSent(false); setError(''); setMessage(''); }}
-            >Link</button>
+              className={`flex-1 py-3 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${tab === 'phone' ? 'bg-brand-primary text-white shadow-glow-green' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}
+              onClick={() => { setTab('phone'); setOtpSent(false); setError(''); setMessage(''); }}
+            >Shop Login</button>
             <button 
-              className={`flex-1 py-3 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${tab === 'otp' ? 'bg-brand-primary text-white shadow-glow-green' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}
-              onClick={() => { setTab('otp'); setError(''); setMessage(''); }}
-            >OTP</button>
-            <button 
-              className={`flex-1 py-3 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${tab === 'password' ? 'bg-brand-primary text-white shadow-glow-green' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}
-              onClick={() => { setTab('password'); setOtpSent(false); setError(''); setMessage(''); }}
-            >Key</button>
+              className={`flex-1 py-3 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${tab === 'admin' ? 'bg-brand-primary text-white shadow-glow-green' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}
+              onClick={() => { setTab('admin'); setError(''); setMessage(''); }}
+            >Admin</button>
           </div>
 
           <AnimatePresence mode="wait">
@@ -177,72 +170,94 @@ export default function Login() {
           </AnimatePresence>
 
           <div className="space-y-6">
-            <Input 
-              label="Transmission ID (Email)" 
-              type="email" 
-              value={email} 
-              onChange={(e) => setEmail(e.target.value)} 
-              icon={<Mail size={18} className="text-brand-primary" />} 
-              placeholder="nexus@hub.com"
-              className="bg-white/10 border-white/10 focus:border-brand-primary transition-all text-xs font-bold tracking-widest"
-              labelClassName="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 ml-1"
-            />
+            {tab === 'phone' && (
+              <>
+                <Input 
+                  label="Mobile Number" 
+                  type="tel" 
+                  value={phone} 
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} 
+                  icon={<Phone size={18} className="text-brand-primary" />} 
+                  placeholder="9876543210"
+                  disabled={otpSent}
+                  className="bg-white/10 border-white/10 focus:border-brand-primary transition-all text-xs font-bold tracking-widest"
+                  labelClassName="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 ml-1"
+                />
 
-            {tab === 'password' && (
-              <Input 
-                label="Authorization Key" 
-                type={showPassword ? 'text' : 'password'} 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
-                icon={<KeyRound size={18} className="text-brand-primary" />} 
-                placeholder="••••••••"
-                className="bg-white/10 border-white/10 focus:border-brand-primary transition-all text-xs font-bold tracking-widest"
-                labelClassName="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 ml-1"
-                endIcon={
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="focus:outline-none text-slate-500 hover:text-brand-primary transition-colors pr-4"
-                    tabIndex={-1}
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                }
-              />
+                {otpSent && (
+                  <Input 
+                    label="Verification Code" 
+                    type="text" 
+                    value={otp} 
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} 
+                    placeholder="X X X X X X"
+                    className="bg-white/10 border-white/10 focus:border-brand-primary transition-all text-center text-lg font-black tracking-[1em]"
+                    labelClassName="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 ml-1 text-center"
+                  />
+                )}
+              </>
             )}
 
-            {tab === 'otp' && otpSent && (
-              <Input 
-                label="Verification Code" 
-                type="text" 
-                value={otp} 
-                onChange={(e) => setOtp(e.target.value)} 
-                placeholder="X X X X X X"
-                className="bg-white/10 border-white/10 focus:border-brand-primary transition-all text-center text-lg font-black tracking-[1em]"
-                labelClassName="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 ml-1 text-center"
-              />
+            {tab === 'admin' && (
+              <>
+                <Input 
+                  label="Admin Email" 
+                  type="email" 
+                  value={email} 
+                  onChange={(e) => setEmail(e.target.value)} 
+                  icon={<Mail size={18} className="text-brand-primary" />} 
+                  placeholder="nexus@hub.com"
+                  className="bg-white/10 border-white/10 focus:border-brand-primary transition-all text-xs font-bold tracking-widest"
+                  labelClassName="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 ml-1"
+                />
+                <Input 
+                  label="Authorization Key" 
+                  type={showPassword ? 'text' : 'password'} 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                  icon={<KeyRound size={18} className="text-brand-primary" />} 
+                  placeholder="••••••••"
+                  className="bg-white/10 border-white/10 focus:border-brand-primary transition-all text-xs font-bold tracking-widest"
+                  labelClassName="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 ml-1"
+                  endIcon={
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="focus:outline-none text-slate-500 hover:text-brand-primary transition-colors pr-4"
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  }
+                />
+              </>
             )}
 
             <div className="pt-4">
-              {tab === 'magic' && (
-                 <Button className="w-full h-16 !rounded-2xl shadow-glow-green text-sm font-black uppercase tracking-widest italic" onClick={handleSendMagicLink} isLoading={loading}>
-                   {t('auth.sendLink')} <ArrowRight size={18} className="ml-2" />
+              {tab === 'admin' && (
+                 <Button className="w-full h-16 !rounded-2xl shadow-glow-green text-sm font-black uppercase tracking-widest italic group" onClick={handlePasswordLogin} isLoading={loading}>
+                   {t('auth.loginBtn')} <Fingerprint size={18} className="ml-2 group-hover:scale-110 transition-transform" />
                  </Button>
               )}
-              {tab === 'password' && (
-                 <Button className="w-full h-16 !rounded-2xl shadow-glow-green text-sm font-black uppercase tracking-widest italic" onClick={handlePasswordLogin} isLoading={loading}>
-                   {t('auth.loginBtn')} <Fingerprint size={18} className="ml-2" />
+              {tab === 'phone' && !otpSent && (
+                 <Button className="w-full h-16 !rounded-2xl shadow-glow-green text-sm font-black uppercase tracking-widest italic group" onClick={handleSendOTP} isLoading={loading}>
+                   {t('auth.sendOtp')} <Zap size={18} className="ml-2 group-hover:translate-x-1 transition-transform" />
                  </Button>
               )}
-              {tab === 'otp' && !otpSent && (
-                 <Button className="w-full h-16 !rounded-2xl shadow-glow-green text-sm font-black uppercase tracking-widest italic" onClick={handleSendOTP} isLoading={loading}>
-                   {t('auth.sendOtp')} <Zap size={18} className="ml-2" />
-                 </Button>
-              )}
-              {tab === 'otp' && otpSent && (
-                 <Button className="w-full h-16 !rounded-2xl shadow-glow-green text-sm font-black uppercase tracking-widest italic" onClick={handleVerifyOTP} isLoading={loading}>
-                   {t('auth.verifyOtp')} <Shield size={18} className="ml-2" />
-                 </Button>
+              {tab === 'phone' && otpSent && (
+                 <div className="flex flex-col gap-3">
+                   <Button className="w-full h-16 !rounded-2xl shadow-glow-green text-sm font-black uppercase tracking-widest italic group" onClick={handleVerifyOTP} isLoading={loading}>
+                     {t('auth.verifyOtp')} <Shield size={18} className="ml-2" />
+                   </Button>
+                   <Button 
+                      variant="ghost" 
+                      className="w-full h-12 !rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white"
+                      onClick={handleSendOTP}
+                      disabled={otpCooldown > 0 || loading}
+                    >
+                      {otpCooldown > 0 ? `Resend OTP in ${otpCooldown}s` : 'Resend OTP'}
+                    </Button>
+                 </div>
               )}
             </div>
           </div>

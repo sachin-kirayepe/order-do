@@ -1,50 +1,76 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, KeyRound, Eye, EyeOff, Sparkles, UserPlus, Zap, ArrowRight, ShieldCheck, ArrowLeft } from 'lucide-react';
+import { Phone, Sparkles, UserPlus, Zap, ArrowRight, ShieldCheck, ArrowLeft, Shield } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import LanguageSwitcher from '../../components/ui/LanguageSwitcher';
 import { motion, AnimatePresence } from 'framer-motion';
 import GlassCard from '../../components/ui/GlassCard';
 
 export default function Register() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const navigate = useNavigate();
   const { t, language } = useLanguage();
-  const [showPassword, setShowPassword] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
 
-  const handleRegister = async () => {
-    // TC-022 FIX: Password strength validation
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long');
-      return;
-    }
-    if (!/[A-Z]/.test(password)) {
-      setError('Password must contain at least one uppercase letter');
-      return;
-    }
-    if (!/[a-z]/.test(password)) {
-      setError('Password must contain at least one lowercase letter');
-      return;
-    }
-    if (!/[0-9]/.test(password)) {
-      setError('Password must contain at least one number');
-      return;
-    }
+  useEffect(() => {
+    if (otpCooldown <= 0) return;
+    const timer = setTimeout(() => setOtpCooldown(prev => prev - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [otpCooldown]);
 
+  const handleSendOTP = async () => {
+    if (!phone || phone.length < 10) {
+      setError('Please enter a valid 10-digit mobile number');
+      return;
+    }
+    if (otpCooldown > 0) return;
+    
     setLoading(true); setError(''); setMessage('');
-    const { error } = await supabase.auth.signUp({ email, password });
+    const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
+
+    const { error } = await supabase.auth.signInWithOtp({ phone: formattedPhone });
+    
     if (error) {
       setError(error.message);
     } else {
-      setMessage(t('auth.registerSuccess'));
-      setTimeout(() => navigate('/shop/setup'), 2000);
+      setOtpSent(true);
+      setMessage('OTP sent successfully to your mobile');
+      setOtpCooldown(60);
+    }
+    setLoading(false);
+  };
+
+  const handleVerifyOTP = async () => {
+    if (!otp || otp.length !== 6) {
+      setError('Please enter a valid 6-digit OTP');
+      return;
+    }
+
+    setLoading(true); setError('');
+    const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
+
+    const { data, error } = await supabase.auth.verifyOtp({ phone: formattedPhone, token: otp, type: 'sms' });
+    
+    if (error) {
+      setError(error.message);
+    } else if (data.session?.user) {
+      setMessage('Verified successfully!');
+      // Check if user already has a shop profile
+      const { data: roleData } = await supabase.from('shops_profile').select('shop_id').eq('id', data.session.user.id).single();
+      
+      if (roleData?.shop_id) {
+        navigate('/shop/dashboard');
+      } else {
+        navigate('/shop/setup');
+      }
     }
     setLoading(false);
   };
@@ -113,36 +139,28 @@ export default function Register() {
 
           <div className="space-y-6">
             <Input 
-              label="Transmission ID (Email)" 
-              type="email" 
-              value={email} 
-              onChange={(e) => setEmail(e.target.value)} 
-              icon={<Mail size={18} className="text-brand-primary" />} 
-              placeholder="nexus@hub.com"
+              label="Mobile Number" 
+              type="tel" 
+              value={phone} 
+              onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} 
+              icon={<Phone size={18} className="text-brand-primary" />} 
+              placeholder="9876543210"
+              disabled={otpSent}
               className="bg-white/10 border-white/10 focus:border-brand-primary transition-all text-xs font-bold tracking-widest"
               labelClassName="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 ml-1"
             />
 
-            <Input 
-              label="Access Secret (Password)" 
-              type={showPassword ? 'text' : 'password'} 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              icon={<KeyRound size={18} className="text-brand-primary" />} 
-              placeholder="••••••••"
-              className="bg-white/10 border-white/10 focus:border-brand-primary transition-all text-xs font-bold tracking-widest"
-              labelClassName="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 ml-1"
-              endIcon={
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="focus:outline-none text-slate-500 hover:text-brand-primary transition-colors pr-4"
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              }
-            />
+            {otpSent && (
+              <Input 
+                label="Verification Code (OTP)" 
+                type="text" 
+                value={otp} 
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} 
+                placeholder="X X X X X X"
+                className="bg-white/10 border-white/10 focus:border-brand-primary transition-all text-center text-lg font-black tracking-[1em]"
+                labelClassName="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 ml-1 text-center"
+              />
+            )}
 
             <div className="pt-2 text-center">
               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-relaxed">
@@ -154,14 +172,35 @@ export default function Register() {
             </div>
 
             <div className="pt-4">
-              <Button 
-                className="w-full h-16 !rounded-2xl shadow-glow-green text-sm font-black uppercase tracking-widest italic group" 
-                onClick={handleRegister} 
-                isLoading={loading}
-              >
-                {t('auth.registerBtn')} 
-                <ArrowRight size={18} className="ml-2 group-hover:translate-x-1 transition-transform" />
-              </Button>
+              {!otpSent ? (
+                <Button 
+                  className="w-full h-16 !rounded-2xl shadow-glow-green text-sm font-black uppercase tracking-widest italic group" 
+                  onClick={handleSendOTP} 
+                  isLoading={loading}
+                >
+                  Send OTP
+                  <ArrowRight size={18} className="ml-2 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <Button 
+                    className="w-full h-16 !rounded-2xl shadow-glow-green text-sm font-black uppercase tracking-widest italic group" 
+                    onClick={handleVerifyOTP} 
+                    isLoading={loading}
+                  >
+                    Verify & Create Shop
+                    <Shield size={18} className="ml-2" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    className="w-full h-12 !rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white"
+                    onClick={handleSendOTP}
+                    disabled={otpCooldown > 0 || loading}
+                  >
+                    {otpCooldown > 0 ? `Resend OTP in ${otpCooldown}s` : 'Resend OTP'}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 

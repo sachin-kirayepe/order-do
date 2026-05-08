@@ -26,7 +26,7 @@ export default function Setup() {
   // Step 1: Profile
   const [shopName, setShopName] = useState('');
   const [ownerName, setOwnerName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(user?.phone?.replace(/^\+91/, '') || '');
   const [address, setAddress] = useState('');
   const [upiId, setUpiId] = useState('');
   const [shopType, setShopType] = useState('Kirana');
@@ -189,8 +189,9 @@ export default function Setup() {
                     label={t('setup.phone')} 
                     type="tel"
                     value={phone} 
-                    onChange={(e) => setPhone(e.target.value)} 
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} 
                     placeholder="9876543210"
+                    disabled={!!user?.phone}
                   />
                   <Input 
                     label={t('setup.address')} 

@@ -56,7 +56,7 @@ export default function OrderPreview({
     <div className="flex flex-col gap-5 relative">
       <ProtectionOverlay isVisible={isBlocked} />
       
-      <h2 className="text-xl font-bold text-slate-800 dark:text-white text-center lowercase tracking-tighter italic">
+      <h2 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white text-center lowercase tracking-tighter italic">
         {t('customer.orderReview')}
       </h2>
 
@@ -71,9 +71,9 @@ export default function OrderPreview({
             className="border-none"
           />
         ) : (
-          <div className="w-full h-32 bg-slate-50 dark:bg-slate-800/50 flex flex-col items-center justify-center gap-2 text-slate-400">
-            <ImageIcon size={28} />
-            <span className="text-sm">{t('customer.photoMissing')}</span>
+          <div className="w-full h-24 md:h-32 bg-slate-50 dark:bg-slate-800/50 flex flex-col items-center justify-center gap-2 text-slate-400">
+            <ImageIcon size={28} className="md:w-8 md:h-8" />
+            <span className="text-xs md:text-sm">{t('customer.photoMissing')}</span>
           </div>
         )}
         {!photo && (
@@ -134,9 +134,9 @@ export default function OrderPreview({
           
           {/* Total Row */}
           {totalAmount > 0 && (
-            <div className="px-4 py-3 bg-kirana-green/5 dark:bg-kirana-green/10 flex justify-between items-center border-t border-kirana-green/20">
-              <span className="text-sm font-black text-slate-500 uppercase tracking-widest">{t('customer.totalAmount')}</span>
-              <span className="text-xl font-black text-kirana-green">₹{totalAmount}</span>
+            <div className="px-3 md:px-4 py-2.5 md:py-3 bg-kirana-green/5 dark:bg-kirana-green/10 flex justify-between items-center border-t border-kirana-green/20">
+              <span className="text-xs md:text-sm font-black text-slate-500 uppercase tracking-widest">{t('customer.totalAmount')}</span>
+              <span className="text-lg md:text-xl font-black text-kirana-green">₹{totalAmount}</span>
             </div>
           )}
         </div>
@@ -154,20 +154,20 @@ export default function OrderPreview({
       {/* Payment Selection */}
       <div className="space-y-3">
         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Payment Method</h3>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2 md:gap-3">
           <button
             onClick={() => !disableCOD && setPaymentMethod('cod')}
             disabled={disableCOD}
-            className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-300 ${
+            className={`flex flex-col items-center gap-1.5 md:gap-2 p-3 md:p-4 rounded-xl md:rounded-2xl border-2 transition-all duration-300 ${
               paymentMethod === 'cod' 
                 ? 'border-kirana-green bg-kirana-green/10 shadow-lg shadow-kirana-green/5' 
                 : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800/50 text-slate-400 opacity-60'
             } ${disableCOD ? 'cursor-not-allowed grayscale' : ''}`}
           >
-            <div className={`p-2 rounded-xl ${paymentMethod === 'cod' ? 'bg-kirana-green text-white' : 'bg-slate-100 dark:bg-slate-700'}`}>
-              <Banknote size={24} />
+            <div className={`p-1.5 md:p-2 rounded-lg md:rounded-xl ${paymentMethod === 'cod' ? 'bg-kirana-green text-white' : 'bg-slate-100 dark:bg-slate-700'}`}>
+              <Banknote size={20} className="md:w-6 md:h-6" />
             </div>
-            <span className="text-xs font-black uppercase tracking-tighter italic">
+            <span className="text-[10px] md:text-xs font-black uppercase tracking-tighter italic">
               {disableCOD ? 'COD Blocked' : t('customer.payCash')}
             </span>
           </button>
@@ -175,21 +175,21 @@ export default function OrderPreview({
           {upiId ? (
             <button
               onClick={() => setPaymentMethod('upi')}
-              className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-300 ${
+              className={`flex flex-col items-center gap-1.5 md:gap-2 p-3 md:p-4 rounded-xl md:rounded-2xl border-2 transition-all duration-300 ${
                 paymentMethod === 'upi' 
                   ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/5' 
                   : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800/50 text-slate-400 opacity-60'
               }`}
             >
-              <div className={`p-2 rounded-xl ${paymentMethod === 'upi' ? 'bg-blue-500 text-white' : 'bg-slate-100 dark:bg-slate-700'}`}>
-                <QrCode size={24} />
+              <div className={`p-1.5 md:p-2 rounded-lg md:rounded-xl ${paymentMethod === 'upi' ? 'bg-blue-500 text-white' : 'bg-slate-100 dark:bg-slate-700'}`}>
+                <QrCode size={20} className="md:w-6 md:h-6" />
               </div>
-              <span className="text-xs font-black uppercase tracking-tighter italic">{t('customer.payUPI')}</span>
+              <span className="text-[10px] md:text-xs font-black uppercase tracking-tighter italic">{t('customer.payUPI')}</span>
             </button>
           ) : (
-            <div className="flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 opacity-30">
-               <QrCode size={24} className="text-slate-300 mb-1" />
-               <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">UPI Unavailable</span>
+            <div className="flex flex-col items-center justify-center p-3 md:p-4 rounded-xl md:rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 opacity-30">
+               <QrCode size={20} className="md:w-6 md:h-6 text-slate-300 mb-1" />
+               <span className="text-[8px] md:text-[10px] font-bold text-slate-300 uppercase tracking-widest text-center">UPI Unavailable</span>
             </div>
           )}
         </div>
@@ -222,13 +222,13 @@ export default function OrderPreview({
 
         {/* ANTI-SPAM: Math Captcha */}
         {!submitted && (
-          <div className="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+          <div className="p-3 md:p-4 bg-slate-50 dark:bg-slate-900/60 rounded-xl md:rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2 md:space-y-3">
              <div className="flex items-center justify-between">
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Verify You Are Human</p>
-                <span className="text-xs font-black text-brand-primary bg-brand-primary/10 px-2 py-0.5 rounded-md">SPAM GUARD</span>
+                <p className="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest">Verify You Are Human</p>
+                <span className="text-[10px] md:text-xs font-black text-brand-primary bg-brand-primary/10 px-1.5 md:px-2 py-0.5 rounded-md">SPAM GUARD</span>
              </div>
-             <div className="flex items-center gap-4">
-                <div className="flex-1 h-12 flex items-center justify-center bg-white dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-xl text-lg font-black tracking-widest italic">
+             <div className="flex items-center gap-3 md:gap-4">
+                <div className="flex-1 h-10 md:h-12 flex items-center justify-center bg-white dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-lg md:rounded-xl text-base md:text-lg font-black tracking-widest italic">
                   {captchaProblem.a} + {captchaProblem.b} = ?
                 </div>
                 <input 
@@ -236,7 +236,7 @@ export default function OrderPreview({
                   placeholder="Ans"
                   value={captchaAnswer}
                   onChange={(e) => setCaptchaAnswer(e.target.value)}
-                  className="w-24 h-12 bg-white dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-xl text-center text-lg font-black outline-none focus:border-brand-primary transition-all"
+                  className="w-20 md:w-24 h-10 md:h-12 bg-white dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-lg md:rounded-xl text-center text-base md:text-lg font-black outline-none focus:border-brand-primary transition-all"
                 />
              </div>
           </div>
@@ -255,7 +255,7 @@ export default function OrderPreview({
         onClick={() => onSubmit(paymentMethod, paymentUtr)}
         disabled={!canSubmit || (paymentMethod === 'upi' && paymentUtr.length < 12)}
         isLoading={submitting}
-        className="w-full py-4 text-lg font-black italic tracking-tighter uppercase"
+        className="w-full py-3 md:py-4 text-base md:text-lg font-black italic tracking-tighter uppercase !rounded-xl md:!rounded-2xl"
       >
         {t('customer.submitOrder')} ✓
       </Button>

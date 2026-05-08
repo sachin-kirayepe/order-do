@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+  import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
@@ -467,13 +467,13 @@ export default function OrderFlow() {
 
   if (step === 0) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 relative">
-        <GlassCard intensity="high" className="w-full max-w-sm p-8 text-center border-white/40 dark:border-white/10">
-          <div className="w-20 h-20 bg-white dark:bg-slate-900 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 shadow-xl p-4 border border-white/20">
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 md:p-6 relative">
+        <GlassCard intensity="high" className="w-full max-w-sm p-6 md:p-8 text-center border-white/40 dark:border-white/10">
+          <div className="w-16 h-16 md:w-20 md:h-20 bg-white dark:bg-slate-900 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 shadow-xl p-4 border border-white/20">
             <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
           </div>
 
-          <h1 className="text-3xl font-black tracking-tight mb-2">Order-<span className="text-brand-primary">Do</span></h1>
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight mb-2">Order-<span className="text-brand-primary">Do</span></h1>
 
           {shopId ? (
             <div className="mb-6">
@@ -502,7 +502,7 @@ export default function OrderFlow() {
           <Button
             variant="primary"
             size="lg"
-            className="w-full h-16 !rounded-2xl"
+            className="w-full h-14 md:h-16 !rounded-2xl"
             onClick={() => { setStep(1); speak(language === 'hi' ? 'Chaliye shuru karte hain.' : 'Let’s start.'); }}
           >
             {t('customer.startOrder')}
@@ -534,7 +534,7 @@ export default function OrderFlow() {
             {getSteps(t).map((s, idx) => (
               <div key={s.id} className="flex-1 flex items-center gap-2">
                 <div className={`
-                  w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-black transition-all duration-500
+                  w-6 h-6 md:w-8 md:h-8 rounded-full md:rounded-xl flex items-center justify-center text-[10px] font-extrabold transition-all duration-500
                   ${step >= s.id ? 'bg-brand-primary text-white shadow-glow-green scale-110' : 'bg-white/40 dark:bg-slate-800/40 text-slate-400 border border-white/10'}
                 `}>
                   {step > s.id ? '✓' : s.id}
@@ -558,7 +558,7 @@ export default function OrderFlow() {
       </div>
 
       {/* Main Flow Area */}
-      <div className="flex-1 pt-24 pb-32 px-6">
+      <div className="flex-1 pt-20 pb-28 md:pt-24 md:pb-32 px-4 md:px-6">
         <div className="max-w-md mx-auto h-full">
           <AnimatePresence mode="wait">
             <motion.div
@@ -570,19 +570,19 @@ export default function OrderFlow() {
             >
               <GlassCard intensity="medium" className="p-1 overflow-hidden">
                 {/* Step Header */}
-                <div className="p-6 pb-2">
+                <div className="p-4 md:p-6 pb-2">
                   <div className="flex items-center gap-3 mb-4">
-                    <div className={`p-3 rounded-2xl ${step === 1 ? 'bg-blue-500/10 text-blue-500' : step === 2 ? 'bg-brand-secondary/10 text-brand-secondary' : 'bg-brand-primary/10 text-brand-primary'}`}>
+                    <div className={`p-2 md:p-3 rounded-2xl ${step === 1 ? 'bg-blue-500/10 text-blue-500' : step === 2 ? 'bg-brand-secondary/10 text-brand-secondary' : 'bg-brand-primary/10 text-brand-primary'}`}>
                       {getSteps(t)[step - 1].icon && <IconComponent icon={getSteps(t)[step - 1].icon} />}
                     </div>
                     <div>
-                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{t(`customer.steps.${['photo', 'name', 'address', 'items', 'preview'][step - 1]}`)}</h4>
-                      <h2 className="text-xl font-black text-slate-900 dark:text-white">{t(`customer.step${step}Title`)}</h2>
+                      <h4 className="hidden md:block text-[10px] font-extrabold uppercase tracking-[0.2em] text-slate-400">{t(`customer.steps.${['photo', 'name', 'address', 'items', 'preview'][step - 1]}`)}</h4>
+                      <h2 className="text-lg md:text-xl font-extrabold text-slate-900 dark:text-white">{t(`customer.step${step}Title`)}</h2>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-6 pt-0 space-y-6">
+                <div className="p-4 md:p-6 pt-0 space-y-4 md:space-y-6">
                   {step === 1 && <CameraCapture shopId={shopId} onCapture={setPhoto} />}
                   {step === 2 && (
                     <div className="space-y-6">
@@ -671,12 +671,12 @@ export default function OrderFlow() {
 
       {/* Floating Bottom Navigation */}
       {step < 5 && !submitted && (
-        <div className="fixed bottom-0 left-0 right-0 p-6 z-40 bg-gradient-to-t from-white dark:from-slate-950 to-transparent">
-          <div className="max-w-md mx-auto">
+        <div className="fixed bottom-0 left-0 right-0 p-4 md:p-6 pb-[calc(1rem+env(safe-area-inset-bottom))] md:pb-6 z-40 bg-gradient-to-t from-white dark:from-slate-950 to-transparent pointer-events-none">
+          <div className="max-w-md mx-auto pointer-events-auto">
             <Button
               disabled={!canGoNext()}
               onClick={() => setStep(s => s + 1)}
-              className="w-full h-16 shadow-glow-green"
+              className="w-full h-14 md:h-16 shadow-glow-green"
               size="lg"
             >
               {t('common.next')}

@@ -796,10 +796,10 @@ export default function Dashboard() {
         <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-brand-primary/5 blur-[120px] rounded-full -ml-20 -mt-20 pointer-events-none" />
         <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-brand-secondary/5 blur-[120px] rounded-full -mr-20 -mb-20 pointer-events-none" />
 
-        <header className="h-20 flex items-center px-4 md:px-8 bg-slate-900/40 backdrop-blur-2xl border-b border-white/5 sticky top-0 z-50">
+        <header className="h-16 md:h-20 flex items-center px-4 md:px-8 bg-slate-900/40 backdrop-blur-2xl border-b border-white/5 sticky top-0 z-50">
           <div className="flex items-center justify-between max-w-7xl mx-auto w-full">
-            <div className="flex items-center gap-4 min-w-0">
-              <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center p-2 shadow-inner shrink-0 group hover:border-brand-primary/30 transition-colors">
+            <div className="flex items-center gap-2 md:gap-4 min-w-0">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center p-2 shadow-inner shrink-0 group hover:border-brand-primary/30 transition-colors">
                 <img src="/logo.png" alt="Logo" className="w-full h-full object-contain filter drop-shadow-glow" />
               </div>
               <div className="flex flex-col min-w-0">
@@ -817,7 +817,7 @@ export default function Dashboard() {
                     width={150} 
                     height={16} 
                     fontSize={11} 
-                    className="border-none bg-transparent opacity-40 font-bold" 
+                    className="border-none bg-transparent opacity-40 font-bold hidden md:block" 
                     tagline="Secure ID"
                   />
                   <div className="flex items-center gap-1.5 px-2 py-0.5 bg-brand-primary/10 text-brand-primary rounded-full border border-brand-primary/20">
@@ -829,7 +829,7 @@ export default function Dashboard() {
             </div>
 
             <div className="flex items-center gap-3">
-               <div className="hidden md:flex items-center gap-2 mr-4">
+               <div className="hidden lg:flex items-center gap-2 mr-4">
                   <Button variant="ghost" size="sm" onClick={() => navigate('/shop/kds')} className="gap-2">
                      <UtensilsCrossed size={16} /> KDS
                   </Button>
@@ -840,19 +840,19 @@ export default function Dashboard() {
                   )}
                </div>
 
-               <div className="flex items-center gap-1 bg-white/5 dark:bg-slate-900/40 p-1 rounded-2xl border border-white/10">
-                  <Button variant="ghost" size="sm" className="!p-0 w-10 h-10 rounded-xl" onClick={() => { setAutoAnnounce(!autoAnnounce); haptics.light(); }}>
-                     {autoAnnounce ? <Bell size={18} className="text-brand-primary" /> : <BellOff size={18} className="text-slate-400" />}
+               <div className="flex items-center gap-1 bg-white/5 dark:bg-slate-900/40 p-1 rounded-xl md:rounded-2xl border border-white/10">
+                  <Button variant="ghost" size="sm" className="!p-0 w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl" onClick={() => { setAutoAnnounce(!autoAnnounce); haptics.light(); }}>
+                     {autoAnnounce ? <Bell size={16} className="text-brand-primary" /> : <BellOff size={16} className="text-slate-400" />}
                   </Button>
-                  <Button variant="ghost" size="sm" className="!p-0 w-10 h-10 rounded-xl text-brand-primary" onClick={() => setShowTutorial(true)}>
-                     <HelpCircle size={18} />
+                  <Button variant="ghost" size="sm" className="!p-0 w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl text-brand-primary hidden md:flex" onClick={() => setShowTutorial(true)}>
+                     <HelpCircle size={16} />
                   </Button>
-                  <LanguageSwitcher />
-                  <Button variant="ghost" size="sm" className="!p-0 w-10 h-10 rounded-xl" onClick={toggleTheme}>
-                     {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+                  <div className="hidden md:block"><LanguageSwitcher /></div>
+                  <Button variant="ghost" size="sm" className="!p-0 w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl" onClick={toggleTheme}>
+                     {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
                   </Button>
-                  <Button variant="ghost" size="sm" className="!p-0 w-10 h-10 rounded-xl text-red-500" onClick={() => { logout(); navigate('/'); }}>
-                     <LogOut size={18} />
+                  <Button variant="ghost" size="sm" className="!p-0 w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl text-red-500" onClick={() => { logout(); navigate('/'); }}>
+                     <LogOut size={16} />
                   </Button>
                </div>
             </div>
@@ -887,7 +887,7 @@ export default function Dashboard() {
           )}
         </AnimatePresence>
 
-        <div className="sticky top-[81px] z-40 bg-white/20 dark:bg-slate-900/20 backdrop-blur-3xl px-6 py-2 border-b border-white/10">
+        <div className="sticky top-[64px] md:top-[81px] z-40 bg-white/20 dark:bg-slate-900/20 backdrop-blur-3xl px-4 md:px-6 py-2 border-b border-white/10">
            <nav className="flex gap-2 overflow-x-auto no-scrollbar max-w-2xl mx-auto">
             {(['orders', 'history', 'menu', 'reviews', 'qr', 'report', 'settings'] as Tab[]).map((k) => {
               const Icon = k === 'orders' ? ListOrdered : k === 'history' ? History : k === 'menu' ? UtensilsCrossed : k === 'reviews' ? Star : k === 'qr' ? QrCode : k === 'settings' ? Settings : TrendingUp;
@@ -897,11 +897,11 @@ export default function Dashboard() {
                   key={k}
                   onClick={() => { setTab(k); haptics.light(); }}
                   className={`
-                    flex items-center gap-2 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap
+                    flex items-center gap-1.5 md:gap-2 px-3 md:px-5 py-2 md:py-3 rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap
                     ${isActive ? 'bg-brand-primary text-white shadow-glow-green scale-105' : 'bg-white/40 dark:bg-slate-900/40 text-slate-500 border border-white/10 hover:bg-white/60'}
                   `}
                 >
-                  <Icon size={16} />
+                  <Icon size={14} className="md:w-4 md:h-4" />
                   <span>
                     {t(`dashboard.${k}` as any) || k.toUpperCase()}
                   </span>
@@ -919,47 +919,47 @@ export default function Dashboard() {
               {/* Premium Dashboard Stats */}
               {!subLoading && (
                 <div className="grid grid-cols-2 gap-4 mb-6">
-                  <GlassCard intensity="high" className="p-6 relative overflow-hidden group">
+                  <GlassCard intensity="high" className="p-4 md:p-6 relative overflow-hidden group">
                      <div className="relative z-10">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Today's Sales</p>
-                        <h3 className="text-3xl font-black text-slate-900 dark:text-white flex items-baseline gap-1 break-all">
-                           <span className="text-sm">₹</span>
+                        <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Today's Sales</p>
+                        <h3 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white flex items-baseline gap-1 break-all">
+                           <span className="text-xs md:text-sm">₹</span>
                            {history.filter(h => new Date(h.completedAt).toDateString() === new Date().toDateString()).reduce((sum, o) => sum + o.total, 0)}
                         </h3>
                      </div>
-                     <div className="absolute -bottom-4 -right-4 bg-brand-primary/10 p-6 rounded-full group-hover:scale-110 transition-transform">
-                        <TrendingUp size={48} className="text-brand-primary/20" />
+                     <div className="absolute -bottom-4 -right-4 bg-brand-primary/10 p-4 md:p-6 rounded-full group-hover:scale-110 transition-transform">
+                        <TrendingUp size={36} className="md:w-12 md:h-12 text-brand-primary/20" />
                      </div>
                   </GlassCard>
 
-                  <GlassCard intensity="high" className="p-6 relative overflow-hidden group">
+                  <GlassCard intensity="high" className="p-4 md:p-6 relative overflow-hidden group">
                      <div className="relative z-10">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Pending Orders</p>
-                        <h3 className="text-3xl font-black text-slate-900 dark:text-white break-all">
+                        <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Pending Orders</p>
+                        <h3 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white break-all">
                            {pending.length}
                         </h3>
                      </div>
-                     <div className="absolute -bottom-4 -right-4 bg-brand-secondary/10 p-6 rounded-full group-hover:scale-110 transition-transform">
-                        <PackageOpen size={48} className="text-brand-secondary/20" />
+                     <div className="absolute -bottom-4 -right-4 bg-brand-secondary/10 p-4 md:p-6 rounded-full group-hover:scale-110 transition-transform">
+                        <PackageOpen size={36} className="md:w-12 md:h-12 text-brand-secondary/20" />
                      </div>
                   </GlassCard>
 
-                  <GlassCard intensity="medium" className="col-span-2 p-6 flex items-center justify-between border-brand-primary/20 bg-brand-primary/5">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${!subscription || isExpired(subscription.expiry_date) ? 'bg-red-500' : isExpiringSoon(subscription.expiry_date) ? 'bg-amber-500' : 'bg-brand-primary'} text-white shadow-xl`}>
-                        <ShieldCheck size={24} />
+                  <GlassCard intensity="medium" className="col-span-2 p-4 md:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-brand-primary/20 bg-brand-primary/5">
+                    <div className="flex items-center gap-3 md:gap-4">
+                      <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center shrink-0 ${!subscription || isExpired(subscription.expiry_date) ? 'bg-red-500' : isExpiringSoon(subscription.expiry_date) ? 'bg-amber-500' : 'bg-brand-primary'} text-white shadow-xl`}>
+                        <ShieldCheck size={20} className="md:w-6 md:h-6" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-black uppercase tracking-tight italic">
+                        <h4 className="text-xs md:text-sm font-black uppercase tracking-tight italic">
                            {!subscription ? 'No Plan Active' : isExpired(subscription.expiry_date) ? 'Plan Expired' : `${subscription.plan.name} License Active`}
                         </h4>
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                        <p className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                            Expires: {subscription ? getFormattedRemainingTime(subscription.expiry_date, language) : 'N/A'}
                         </p>
                       </div>
                     </div>
                     {(!subscription || isExpired(subscription.expiry_date)) && (
-                       <Button size="sm" variant="primary" onClick={handleSupport} className="shadow-glow-green">Renew</Button>
+                       <Button size="sm" variant="primary" onClick={handleSupport} className="shadow-glow-green w-full md:w-auto">Renew</Button>
                     )}
                   </GlassCard>
                 </div>
@@ -1146,13 +1146,13 @@ export default function Dashboard() {
                               <span className="text-[10px] font-black text-slate-400 uppercase">Extra QRs</span>
                               <button onClick={handlePrintAllQRs} className="text-[10px] font-bold text-kirana-green uppercase">Print All</button>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {profile.extraQRs.map((ex, i) => (
                                 <div key={i} className="group relative p-3 bg-white dark:bg-slate-900 border rounded-2xl flex flex-col items-center">
                                   <QRItem shopId={profile.shopId} type={ex.type} no={ex.no} code={ex.code} />
                                   <p className="mt-2 text-[10px] font-bold uppercase">{ex.type} {ex.no}</p>
-                                  <button onClick={() => handleDeleteExtraQR(ex.type, ex.no)} className="absolute top-2 right-2 text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Trash2 size={12} />
+                                  <button onClick={() => handleDeleteExtraQR(ex.type, ex.no)} className="absolute top-2 right-2 text-red-400 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity p-2 bg-red-50 dark:bg-red-900/20 md:bg-transparent rounded-full">
+                                    <Trash2 size={16} className="md:w-3 md:h-3" />
                                   </button>
                                 </div>
                               ))}

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Camera, RefreshCcw, CheckCircle, Eye, Volume2, Info, AlertTriangle, Zap } from 'lucide-react';
-// Late-imported: FaceLandmarker, FilesetResolver from '@mediapipe/tasks-vision'
 import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../ui/Button';
 import { compressPhoto } from '../../utils/compress';
@@ -10,7 +9,37 @@ import ProtectionOverlay from '../ui/ProtectionOverlay';
 import SecureCanvas from '../ui/SecureCanvas';
 import PrivacyConsent from '../ui/PrivacyConsent';
 import { useVoice } from '../../context/VoiceContext';
-import { analyzeEnvironment } from '../../utils/cameraUtils';
+
+// Fast environment check using a tiny 64x64 canvas to prevent lag on low-end devices
+function analyzeEnvironmentFast(video: HTMLVideoElement): { isTooDark: boolean; isTooBright: boolean; isBlurry: boolean } {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return { isTooDark: false, isTooBright: false, isBlurry: false };
+    
+    ctx.drawImage(video, 0, 0, 64, 64);
+    const imageData = ctx.getImageData(0, 0, 64, 64);
+    const data = imageData.data;
+    
+    let totalBrightness = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      // relative luminance
+      const brightness = (data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114);
+      totalBrightness += brightness;
+    }
+    const avgBrightness = totalBrightness / (64 * 64);
+    
+    return {
+      isTooDark: avgBrightness < 30, // 0-255 scale
+      isTooBright: avgBrightness > 240,
+      isBlurry: false // Blurry check skipped to save CPU cycles
+    };
+  } catch (e) {
+    return { isTooDark: false, isTooBright: false, isBlurry: false };
+  }
+}
 
 interface CameraCaptureProps {
   shopId: string;
@@ -23,6 +52,7 @@ export default function CameraCapture({ shopId, onCapture }: CameraCaptureProps)
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const landmarkerRef = useRef<any | null>(null);
   const requestRef = useRef<number>(null);
+  const lastInferenceTimeRef = useRef<number>(0);
 
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [captured, setCaptured] = useState<string | null>(null);
@@ -33,39 +63,38 @@ export default function CameraCapture({ shopId, onCapture }: CameraCaptureProps)
   const [hasConsent, setHasConsent] = useState(false);
   const { isBlocked } = useAntiCapture(hasConsent);
 
-  // Status Streaks (Feedback Smoothing)
   const faceStreakRef = useRef(0);
-  const darkStreakRef = useRef(0);
-  const positionStreakRef = useRef(0);
-
-  const [livenessStep, setLivenessStep] = useState<'blink' | 'success' | 'failed'>('blink');
-  const [blinkCount, setBlinkCount] = useState(0);
-  const [lastEar, setLastEar] = useState(1);
+  
+  const [livenessStep, setLivenessStep] = useState<'action' | 'success' | 'failed'>('action');
   const [isCapturing, setIsCapturing] = useState(false);
   
   const [isFaceDetected, setIsFaceDetected] = useState(false);
   const [isPositionIdeal, setIsPositionIdeal] = useState(false);
   const [faceCount, setFaceCount] = useState(0);
-  const [envFeedback, setEnvFeedback] = useState<{ isTooDark: boolean; isTooBright: boolean; isBlurry: boolean }>({ isTooDark: false, isTooBright: false, isBlurry: false });
+  const [envFeedback, setEnvFeedback] = useState({ isTooDark: false, isTooBright: false, isBlurry: false });
   const [tip, setTip] = useState<string | null>(null);
   const [showVoice, setShowVoice] = useState(true);
   
-  const [timer, setTimer] = useState(30);
+  const [timer, setTimer] = useState(20);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const lastEnvCheckRef = useRef(0);
   
-  const [baselineEar, setBaselineEar] = useState<number | null>(null);
-  const earBufferRef = useRef<number[]>([]);
+  const initialNoseXRef = useRef<number | null>(null);
   const [showFlash, setShowFlash] = useState(false);
 
   const vibrate = useCallback((pattern: number | number[]) => {
-    if (navigator.vibrate) navigator.vibrate(pattern);
+    if (navigator.vibrate) {
+      try { navigator.vibrate(pattern); } catch (e) {}
+    }
   }, []);
 
   const stopCamera = useCallback(() => {
     if (stream) {
       stream.getTracks().forEach((t) => t.stop());
       setStream(null);
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
   }, [stream]);
 
@@ -81,36 +110,47 @@ export default function CameraCapture({ shopId, onCapture }: CameraCaptureProps)
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d')!;
 
+    // Mirror image so the captured photo matches the preview exactly
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transform for watermark
 
     const now = new Date();
     const dateStr = now.toLocaleDateString('hi-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const timeStr = now.toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit' });
     const watermark = `${shopId} | ${dateStr} ${timeStr}`;
 
-    const fontSize = Math.floor(canvas.width / 32);
-    ctx.font = `bold ${fontSize}px monospace`;
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(0, canvas.height - fontSize * 2.2, canvas.width, fontSize * 2.2);
+    const fontSize = Math.max(14, Math.floor(canvas.width / 30));
+    ctx.font = `bold ${fontSize}px sans-serif`;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0, canvas.height - fontSize * 2.5, canvas.width, fontSize * 2.5);
     ctx.fillStyle = '#ffffff';
     ctx.textBaseline = 'middle';
-    ctx.fillText(watermark, 12, canvas.height - fontSize * 1.1);
+    ctx.fillText(watermark, 10, canvas.height - fontSize * 1.25);
 
-    const rawDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    const rawDataUrl = canvas.toDataURL('image/jpeg', 0.80);
 
     setCompressing(true);
-    setTimeout(() => setShowFlash(false), 200);
+    setTimeout(() => setShowFlash(false), 150);
     stopCamera();
 
-    const compressed = await compressPhoto(rawDataUrl, 150 * 1024);
-    setCaptured(compressed);
-    onCapture(compressed);
-    setCompressing(false);
+    try {
+      const compressed = await compressPhoto(rawDataUrl, 100 * 1024);
+      setCaptured(compressed);
+      onCapture(compressed);
+    } catch (e) {
+      console.error(e);
+      setCaptured(rawDataUrl);
+      onCapture(rawDataUrl);
+    } finally {
+      setCompressing(false);
+    }
   }, [shopId, onCapture, stopCamera, vibrate]);
 
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
-    setTimer(30);
+    setTimer(20); // Faster timeout for better flow
     timerRef.current = setInterval(() => {
       setTimer(prev => {
         if (prev <= 1) {
@@ -124,7 +164,8 @@ export default function CameraCapture({ shopId, onCapture }: CameraCaptureProps)
     }, 1000);
   }, [language, speak]);
 
-  const detectBlink = useCallback((landmarks: any[]) => {
+  const detectLivenessAction = useCallback((landmarks: any[]) => {
+    // Check Blink (Eye Aspect Ratio)
     const getDist = (p1: any, p2: any) => Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
     const leftVertical = getDist(landmarks[159], landmarks[145]);
     const leftHorizontal = getDist(landmarks[33], landmarks[133]);
@@ -132,33 +173,24 @@ export default function CameraCapture({ shopId, onCapture }: CameraCaptureProps)
     const rightHorizontal = getDist(landmarks[362], landmarks[263]);
     const ear = ((leftVertical / leftHorizontal) + (rightVertical / rightHorizontal)) / 2;
 
-    if (baselineEar === null) {
-      // Longer calibration for better stability in low light (45 frames)
-      earBufferRef.current = [...earBufferRef.current, ear].slice(-45);
-      if (earBufferRef.current.length === 45) {
-        const avg = earBufferRef.current.reduce((a, b) => a + b, 0) / 45;
-        setBaselineEar(avg);
-      }
-      return;
+    // Check Head Movement (Yaw approximation using nose vs frame boundaries)
+    const nose = landmarks[1];
+    if (initialNoseXRef.current === null) {
+      initialNoseXRef.current = nose.x;
+      return; // Need at least one frame to compare
     }
+    const headMoved = Math.abs(nose.x - initialNoseXRef.current) > 0.02; // Very sensitive head movement detection
 
-    const threshold = baselineEar * 0.65;
+    // Hardcoded EAR threshold for immediate detection without any baseline calibration wait
+    const blinkDetected = ear < 0.22;
 
-    if (ear < threshold && lastEar >= threshold) {
-      vibrate(40);
-      setBlinkCount(prev => {
-        const next = prev + 1;
-        if (next === 1) speak(language === 'hi' ? 'बहुत बढ़िया, एक और बार' : 'Great, one more time');
-        if (next >= 2) {
-          vibrate([50, 30, 50]);
-          setLivenessStep('success');
-          speak(language === 'hi' ? 'सत्यापन सफल, फोटो ली जा रही है' : 'Verification successful, taking photo');
-        }
-        return next;
-      });
+    // Pass liveness immediately if user blinks OR moves head slightly
+    if (blinkDetected || headMoved) {
+      vibrate([50, 30, 50]);
+      setLivenessStep('success');
+      speak(language === 'hi' ? 'सत्यापन सफल, फोटो ली जा रही है' : 'Verification successful, capturing');
     }
-    setLastEar(ear);
-  }, [lastEar, language, speak, vibrate, baselineEar]);
+  }, [language, speak, vibrate]);
 
   const processVideoFrame = useCallback(async () => {
     const video = videoRef.current;
@@ -169,75 +201,62 @@ export default function CameraCapture({ shopId, onCapture }: CameraCaptureProps)
     }
 
     const now = performance.now();
-    const results = landmarker.detectForVideo(video, now);
-    const detectedFaces = results.faceLandmarks || [];
-    const faceCountRaw = detectedFaces.length;
-    setFaceCount(faceCountRaw);
-
-    // Face Detection Streak (Smooth out flickering)
-    if (faceCountRaw > 0) {
-      faceStreakRef.current = Math.min(faceStreakRef.current + 1, 5);
-    } else {
-      faceStreakRef.current = Math.max(faceStreakRef.current - 1, 0);
+    // Throttle FaceLandmarker to ~16 FPS (60ms) to catch fast blinks while still being performant
+    if (now - lastInferenceTimeRef.current < 60) {
+      requestRef.current = requestAnimationFrame(processVideoFrame);
+      return;
     }
-    setIsFaceDetected(faceStreakRef.current >= 3);
+    lastInferenceTimeRef.current = now;
 
-    // Environment Check Smoothing (1s interval)
+    let detectedFaces = [];
+    try {
+      const results = landmarker.detectForVideo(video, now);
+      detectedFaces = results.faceLandmarks || [];
+    } catch (e) {
+      console.error('Landmarker error', e);
+    }
+    
+    setFaceCount(detectedFaces.length);
+
+    // Fast Environment Check (once per second)
     if (now - lastEnvCheckRef.current > 1000) {
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(video, 0, 0);
-        const analysis = analyzeEnvironment(ctx, canvas.width, canvas.height);
-        
-        // Dark Streak
-        if (analysis.isTooDark) {
-          darkStreakRef.current = Math.min(darkStreakRef.current + 1, 3);
-        } else {
-          darkStreakRef.current = 0;
-        }
-
-        setEnvFeedback({ 
-          isTooDark: darkStreakRef.current >= 2, 
-          isTooBright: analysis.isTooBright, 
-          isBlurry: analysis.isBlurry 
-        });
-        lastEnvCheckRef.current = now;
-      }
+      const env = analyzeEnvironmentFast(video);
+      setEnvFeedback(env);
+      lastEnvCheckRef.current = now;
     }
 
-    if (faceStreakRef.current >= 3) {
+    if (detectedFaces.length > 0) {
+      faceStreakRef.current = Math.min(faceStreakRef.current + 1, 3);
+    } else {
+      faceStreakRef.current = 0;
+      initialNoseXRef.current = null; // Reset head movement baseline when face lost
+    }
+    setIsFaceDetected(faceStreakRef.current >= 1); // Instantly detect face
+
+    if (faceStreakRef.current >= 1) {
       const landmarks = detectedFaces[0];
       const faceWidth = Math.abs(landmarks[454].x - landmarks[234].x);
-      const isIdealRaw = faceWidth > 0.25 && faceWidth < 0.6;
+      const isIdeal = faceWidth > 0.20 && faceWidth < 0.70; // Highly tolerant ideal position
+      setIsPositionIdeal(isIdeal);
 
-      // Position Streak
-      if (isIdealRaw) {
-        positionStreakRef.current = Math.min(positionStreakRef.current + 1, 5);
-      } else {
-        positionStreakRef.current = 0;
-      }
-      setIsPositionIdeal(positionStreakRef.current >= 4);
-
-      if (faceWidth < 0.25) {
-        setTip(language === 'hi' ? 'कैमरा के थोड़ा पास आएं' : 'Come closer to camera');
-      } else if (faceWidth > 0.6) {
-        setTip(language === 'hi' ? 'थोड़ा दूर हटें' : 'Move a bit back');
+      if (faceWidth < 0.20) {
+        setTip(language === 'hi' ? 'थोड़ा पास आएं' : 'Move closer');
+      } else if (faceWidth > 0.70) {
+        setTip(language === 'hi' ? 'थोड़ा दूर हटें' : 'Move back');
       } else {
         setTip(null);
       }
 
-      if (livenessStep === 'blink' && positionStreakRef.current >= 4) {
-        detectBlink(landmarks);
+      if (livenessStep === 'action' && isIdeal) {
+        detectLivenessAction(landmarks);
       }
     } else {
+      setIsPositionIdeal(false);
       setTip(language === 'hi' ? 'चेहरा फ्रेम में लाएं' : 'Bring face into frame');
     }
 
     requestRef.current = requestAnimationFrame(processVideoFrame);
-  }, [livenessStep, detectBlink, language]);
+  }, [livenessStep, detectLivenessAction, language]);
 
   const startCamera = useCallback(async () => {
     setLoading(true);
@@ -246,8 +265,9 @@ export default function CameraCapture({ shopId, onCapture }: CameraCaptureProps)
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { 
           facingMode: 'user', 
-          width: { ideal: 640 }, 
-          height: { ideal: 480 }
+          width: { ideal: 480 }, 
+          height: { ideal: 640 },
+          frameRate: { ideal: 15, max: 30 } // Optimized frame rate for low end phones
         },
         audio: false,
       });
@@ -259,13 +279,14 @@ export default function CameraCapture({ shopId, onCapture }: CameraCaptureProps)
           requestRef.current = requestAnimationFrame(processVideoFrame);
         };
       }
-    } catch {
+    } catch (err) {
       setError(t('customer.cameraError'));
       setLoading(false);
     }
   }, [t, processVideoFrame]);
 
-  const initLandmarker = useCallback(async () => {
+  const initSystem = useCallback(async () => {
+    startCamera();
     try {
       const { FaceLandmarker, FilesetResolver } = await import('@mediapipe/tasks-vision');
       const filesetResolver = await FilesetResolver.forVisionTasks(
@@ -282,41 +303,38 @@ export default function CameraCapture({ shopId, onCapture }: CameraCaptureProps)
       landmarkerRef.current = landmarker;
     } catch (err) {
       console.error("Failed to load face landmarker:", err);
-      setError("Face detection initialization failed.");
+      setError("Face detection failed to load. Check network.");
     }
-  }, []);
+  }, [startCamera]);
 
   const retake = useCallback(() => {
     setCaptured(null);
     setCompressing(false);
-    setLivenessStep('blink');
-    setBlinkCount(0);
-    setBaselineEar(null);
-    earBufferRef.current = [];
+    setLivenessStep('action');
+    initialNoseXRef.current = null;
     faceStreakRef.current = 0;
-    darkStreakRef.current = 0;
-    positionStreakRef.current = 0;
     setIsCapturing(false);
     startTimer();
-    startCamera();
+    initSystem();
     onCapture('');
-  }, [onCapture, startCamera, startTimer]);
+  }, [onCapture, startTimer, initSystem]);
 
   useEffect(() => {
     if (hasConsent) {
-      initLandmarker();
-      startCamera();
+      initSystem();
       startTimer();
     }
     return () => {
+      // Memory Leak Fix: Cleanup properly
       stopCamera();
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
-      if (timerRef.current) {
-         clearInterval(timerRef.current);
-         timerRef.current = null;
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (landmarkerRef.current) {
+        try { landmarkerRef.current.close(); } catch (e) {}
+        landmarkerRef.current = null;
       }
     };
-  }, [hasConsent, initLandmarker, startCamera, startTimer, stopCamera]);
+  }, [hasConsent, initSystem, startTimer, stopCamera]);
 
   useEffect(() => {
     if (livenessStep === 'success' && !isCapturing) {
@@ -324,113 +342,26 @@ export default function CameraCapture({ shopId, onCapture }: CameraCaptureProps)
       setIsCapturing(true);
       const captureTimer = setTimeout(() => {
         capturePhoto();
-      }, 500);
+      }, 100); // Super fast capture delay
       return () => clearTimeout(captureTimer);
     }
   }, [livenessStep, isCapturing, capturePhoto]);
 
   useEffect(() => {
-    if (hasConsent && !loading && livenessStep === 'blink') {
+    if (hasConsent && !loading && livenessStep === 'action') {
       const voiceTimer = setTimeout(() => {
-        speak(language === 'hi' ? 'नमस्ते, कृपया अपनी आँखें दो बार झपकाएं' : 'Hi, please blink your eyes twice');
-      }, 1000);
+        if (showVoice) speak(language === 'hi' ? 'कैमरे में देखें और पलकें झपकाएं' : 'Look at camera and blink');
+      }, 500); // Shorter voice prompt delay
       return () => clearTimeout(voiceTimer);
     }
-  }, [hasConsent, loading, speak, language, livenessStep]);
-
-  // Memoized Silhouette Path to prevent flickering
-  const SilhouetteSVG = useMemo(() => (
-    <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-      <defs>
-        <mask id="face-mask">
-          <rect x="0" y="0" width="100" height="100" fill="white" />
-          <ellipse cx="50" cy="45" rx="28" ry="38" fill="black" />
-        </mask>
-        <radialGradient id="soft-glow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="white" stopOpacity="0.4" />
-          <stop offset="100%" stopColor="white" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      
-      {/* Soft Box Glow - Only visible in low light or while detecting */}
-      <AnimatePresence>
-        {isFaceDetected && !captured && !loading && (
-          <motion.ellipse
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1.2 }}
-            exit={{ opacity: 0 }}
-            cx="50" cy="45" rx="40" ry="50"
-            fill="url(#soft-glow)"
-            className="pointer-events-none"
-            transition={{ duration: 2, repeat: Infinity, repeatType: 'reverse' }}
-          />
-        )}
-      </AnimatePresence>
-
-      <rect
-        x="0" y="0" width="100" height="100"
-        fill="rgba(0,0,0,0.4)"
-        mask="url(#face-mask)"
-      />
-      <ellipse
-        cx="50" cy="45" rx="28" ry="38"
-        fill="none"
-        stroke={faceCount > 1 ? '#ef4444' : isPositionIdeal ? '#22c55e' : isFaceDetected ? '#eab308' : 'rgba(255,255,255,0.4)'}
-        strokeWidth="0.5"
-        className={`transition-all duration-300 ${isPositionIdeal ? 'animate-pulse' : ''}`}
-      />
-
-      {isFaceDetected && !captured && (
-        <g className="opacity-30">
-          {[...Array(8)].map((_, i) => (
-            <motion.circle
-              key={i}
-              cx={50 + 28 * Math.cos(((i * 45) * Math.PI) / 180)}
-              cy={45 + 38 * Math.sin(((i * 45) * Math.PI) / 180)}
-              r="0.3"
-              fill="#22c55e"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: [0, 0.5, 0] }}
-              transition={{ duration: 2, repeat: Infinity, delay: i * 0.2 }}
-            />
-          ))}
-        </g>
-      )}
-
-      {/* Moving Laser Scan Line */}
-      {!captured && !loading && isFaceDetected && (
-        <motion.rect
-          x="22"
-          width="56"
-          height="0.2"
-          fill="url(#laser-gradient)"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: [0, 0.15, 0], y: [10, 80, 10] }}
-          transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
-        />
-      )}
-
-      <defs>
-        <linearGradient id="laser-gradient" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="transparent" />
-          <stop offset="50%" stopColor="#22c55e" />
-          <stop offset="100%" stopColor="transparent" />
-        </linearGradient>
-      </defs>
-    </svg>
-  ), [isFaceDetected, faceCount, isPositionIdeal, captured, loading]);
+  }, [hasConsent, loading, speak, language, livenessStep, showVoice]);
 
   return (
     <div className="flex flex-col items-center gap-4 relative">
       <ProtectionOverlay isVisible={isBlocked} />
       
       {showFlash && (
-        <motion.div 
-          initial={{ opacity: 0 }} 
-          animate={{ opacity: 1 }} 
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-white z-[100] pointer-events-none" 
-        />
+        <div className="fixed inset-0 bg-white z-[100] pointer-events-none transition-opacity duration-150" />
       )}
 
       <AnimatePresence>
@@ -443,179 +374,116 @@ export default function CameraCapture({ shopId, onCapture }: CameraCaptureProps)
 
       {!captured ? (
         <div className="w-full flex flex-col items-center gap-4">
-          {/* Main Camera Container with Soft Box Outer Glow */}
-          <div className={`relative w-full max-w-sm aspect-[4/3] bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border-4 transition-all duration-700 ${isFaceDetected ? 'border-kirana-green/40 shadow-kirana-green/10' : 'border-white/10 shadow-black'}`}>
+          <div className={`relative w-full max-w-sm aspect-[3/4] bg-slate-900 rounded-2xl md:rounded-3xl overflow-hidden shadow-xl border-4 transition-all duration-300 ${isFaceDetected ? 'border-kirana-green/60 shadow-kirana-green/20' : 'border-white/10'}`}>
             
-            {/* Screen Light Injection (Soft Box) */}
-            <AnimatePresence>
-              {isFaceDetected && !loading && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 z-0 bg-white opacity-10 pointer-events-none"
-                />
-              )}
-            </AnimatePresence>
-
             {loading && (
               <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-950 text-white">
-                <div className="w-12 h-12 rounded-full border-4 border-kirana-green/20 border-t-kirana-green animate-spin mb-4" />
-                <div className="text-sm font-bold opacity-50 tracking-widest uppercase">Initializing AI...</div>
+                <div className="w-10 h-10 rounded-full border-4 border-kirana-green/20 border-t-kirana-green animate-spin mb-4" />
+                <div className="text-xs font-bold opacity-60 tracking-wider uppercase">Loading Camera...</div>
               </div>
             )}
 
-            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover grayscale-[20%]" />
+            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover -scale-x-100" />
 
-            {/* SVG Face Guide Silhouette */}
-            <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
-              {SilhouetteSVG}
+            {/* Fast CSS-based Face Guide Silhouette - No laggy SVG! */}
+            <div className="absolute inset-0 z-10 pointer-events-none flex flex-col items-center justify-center overflow-hidden">
+               {/* Center Oval Hole created with box-shadow */}
+               <div className={`w-[75%] h-[60%] md:w-[65%] md:h-[55%] rounded-[50%] border-2 transition-colors duration-300 relative shadow-[0_0_0_9999px_rgba(0,0,0,0.55)] ${isPositionIdeal ? 'border-kirana-green' : isFaceDetected ? 'border-yellow-400' : 'border-white/30'}`}>
+                  {isPositionIdeal && !captured && (
+                     <div className="absolute inset-0 rounded-[50%] border-4 border-kirana-green/30 animate-ping" />
+                  )}
+               </div>
             </div>
 
-            {/* Premium Liveness Overlay */}
-            <div className="absolute inset-0 pointer-events-none z-20 flex flex-col items-center justify-between p-6">
-              <AnimatePresence mode="wait">
-                <motion.div
-                   key={livenessStep}
-                   initial={{ opacity: 0, y: -20 }}
-                   animate={{ opacity: 1, y: 0 }}
-                   exit={{ opacity: 0, y: 20 }}
-                   className="w-full space-y-3"
-                >
-                  <div className={`p-4 rounded-2xl backdrop-blur-xl border-2 transition-all duration-500 ${livenessStep === 'blink' ? 'bg-kirana-green/30 border-kirana-green/50 shadow-lg shadow-kirana-green/20' : 'bg-black/60 border-white/10 opacity-30 scale-95'}`}>
-                    {baselineEar === null && isFaceDetected ? (
-                      <div className="flex items-center gap-3 text-white">
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        <span className="text-sm font-bold uppercase tracking-widest">{language === 'hi' ? 'कैलिब्रेट हो रहा है...' : 'Calibrating...'}</span>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center justify-between mb-2">
-                           <span className="text-white text-base font-bold flex items-center gap-3">
-                             <div className={`p-1.5 rounded-lg ${blinkCount >= 2 ? 'bg-kirana-green text-white shadow-kirana-green/50' : blinkCount > 0 ? 'bg-yellow-500 text-white' : 'bg-white/20 text-white'}`}>
-                               {blinkCount >= 2 ? <CheckCircle size={18} /> : <Eye size={18} className={blinkCount < 2 && isFaceDetected ? 'animate-pulse' : ''} />}
-                             </div>
-                             {language === 'hi' ? 'आंखें झपकाएं' : 'Blink Naturally'}
-                           </span>
-                           {blinkCount > 0 && (
-                             <motion.span
-                               initial={{ scale: 0 }} animate={{ scale: 1 }}
-                               className="bg-kirana-green text-white text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-wider"
-                             >
-                               {blinkCount}/2
-                             </motion.span>
-                           )}
-                        </div>
-                        <div className="flex gap-2">
-                           {[1, 2].map(i => (
-                             <div key={i} className="h-2 flex-1 bg-white/10 rounded-full overflow-hidden">
-                               <motion.div
-                                 className="h-full bg-kirana-green"
-                                 initial={{ width: 0 }}
-                                 animate={{ width: blinkCount >= i ? '100%' : '0%' }}
-                               />
-                             </div>
-                           ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </motion.div>
-              </AnimatePresence>
-
-              {/* Environment & Multi-face Alerts */}
-              <AnimatePresence>
-                {(tip || livenessStep === 'success' || faceCount > 1 || envFeedback.isTooDark || envFeedback.isBlurry) && (
-                  <motion.div
-                     initial={{ opacity: 0, scale: 0.8, y: 20 }}
-                     animate={{ opacity: 1, scale: 1, y: 0 }}
-                     exit={{ opacity: 0, scale: 0.8, y: 20 }}
-                     className={`px-6 py-3 rounded-2xl font-bold flex items-center gap-3 shadow-2xl backdrop-blur-2xl ${faceCount > 1
-                         ? 'bg-red-500 text-white'
-                         : envFeedback.isTooDark
-                           ? 'bg-amber-500/80 text-white'
-                           : livenessStep === 'success'
-                             ? 'bg-kirana-green/90 text-white'
-                             : 'bg-white/95 text-slate-900 border border-slate-200'
-                       }`}
-                  >
-                    {faceCount > 1 ? (
-                      <><AlertTriangle size={20} /> {language === 'hi' ? 'केवल एक व्यक्ति की अनुमति है' : 'Only one person allowed'}</>
-                    ) : envFeedback.isTooDark ? (
-                      <><Zap size={20} className="text-yellow-400" /> {language === 'hi' ? 'रोशनी कम है, रोशनी बढ़ाएं' : 'Low light, add more light'}</>
-                    ) : envFeedback.isBlurry ? (
-                      <><RefreshCcw size={20} /> {language === 'hi' ? 'फोटो धुंधली है' : 'Image is blurry'}</>
-                    ) : livenessStep === 'success' ? (
-                      <><CheckCircle size={24} className="animate-bounce" /> {language === 'hi' ? 'सफल! फोटो ली जा रही है...' : 'Perfect! Capturing...'}</>
-                    ) : (
-                      <><Info size={20} className="text-blue-500" /> {tip}</>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
+            {/* Top Bar for Timer and Voice */}
             <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
-              <div className={`text-[10px] font-mono px-2 py-1 rounded-md backdrop-blur-md border border-white/10 ${timer < 10 ? 'bg-red-500/50 text-white animate-pulse' : 'bg-black/40 text-white/70'}`}>
+              <div className={`text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-md ${timer < 10 ? 'bg-red-500/80 text-white animate-pulse' : 'bg-black/50 text-white'}`}>
                 {timer}s
               </div>
               <button
                  onClick={() => setShowVoice(!showVoice)}
-                 className={`p-2 rounded-full backdrop-blur-md border border-white/20 transition-colors ${showVoice ? 'bg-kirana-green text-white' : 'bg-black/40 text-white/50'}`}
+                 className={`p-2 rounded-full backdrop-blur-md transition-colors ${showVoice ? 'bg-kirana-green/90 text-white' : 'bg-black/50 text-white/50'}`}
               >
                 <Volume2 size={16} />
               </button>
             </div>
 
+            {/* Bottom Status Panel */}
+            <div className="absolute bottom-4 md:bottom-6 left-0 right-0 z-20 flex flex-col items-center px-4">
+               <AnimatePresence mode="wait">
+                 {(tip || livenessStep === 'success' || faceCount > 1 || envFeedback.isTooDark) && (
+                   <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className={`px-4 py-2 rounded-full font-bold text-sm flex items-center gap-2 shadow-lg mb-3 ${faceCount > 1
+                          ? 'bg-red-500 text-white'
+                          : envFeedback.isTooDark
+                            ? 'bg-amber-500 text-white'
+                            : livenessStep === 'success'
+                              ? 'bg-kirana-green text-white'
+                              : 'bg-white text-slate-900'
+                        }`}
+                   >
+                     {faceCount > 1 ? (
+                       <><AlertTriangle size={16} /> {language === 'hi' ? 'केवल एक व्यक्ति' : 'One person only'}</>
+                     ) : envFeedback.isTooDark ? (
+                       <><Zap size={16} /> {language === 'hi' ? 'रोशनी कम है' : 'Low light'}</>
+                     ) : livenessStep === 'success' ? (
+                       <><CheckCircle size={18} /> {language === 'hi' ? 'सफल!' : 'Success!'}</>
+                     ) : (
+                       <><Info size={16} className="text-blue-500" /> {tip}</>
+                     )}
+                   </motion.div>
+                 )}
+               </AnimatePresence>
+
+               {isPositionIdeal && livenessStep === 'action' && (
+                 <motion.div
+                   initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+                   className="bg-kirana-green/90 backdrop-blur-md text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-3 shadow-xl border border-kirana-green/50"
+                 >
+                   <Eye size={24} className="animate-pulse" />
+                   {language === 'hi' ? 'पलक झपकाएं या सिर हिलाएं' : 'Blink or nod your head'}
+                 </motion.div>
+               )}
+            </div>
+
             {livenessStep === 'failed' && (
-              <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 text-white p-6 text-center">
+              <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/95 text-white p-6 text-center backdrop-blur-sm">
                 <div className="bg-red-500/20 p-4 rounded-full mb-4">
-                   <RefreshCcw size={48} className="text-red-500" />
+                   <AlertTriangle size={40} className="text-red-500" />
                 </div>
                 <h3 className="text-xl font-bold mb-2">
                    {language === 'hi' ? 'सत्यापन विफल' : 'Verification Failed'}
                 </h3>
-                <p className="text-sm text-slate-400 mb-6">
+                <p className="text-sm text-slate-300 mb-6 px-4">
                    {language === 'hi'
-                     ? 'निर्धारित समय में प्रक्रिया पूरी नहीं हुई। कृपया अच्छी रोशनी में दोबारा प्रयास करें।'
-                     : 'Process not completed in time. Please try again in a well-lit area.'}
+                     ? 'कृपया अच्छी रोशनी में दोबारा प्रयास करें।'
+                     : 'Please try again in better lighting.'}
                 </p>
-                <Button onClick={retake} variant="primary" className="w-full">
+                <Button onClick={retake} variant="primary" className="w-full max-w-[200px] shadow-lg shadow-kirana-green/30">
                    {language === 'hi' ? 'दोबारा प्रयास करें' : 'Try Again'}
                 </Button>
               </div>
             )}
 
             {compressing && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 text-white z-40 gap-4">
-                <div className="relative">
-                   <div className="w-16 h-16 rounded-full border-4 border-kirana-green/20 border-t-kirana-green animate-spin" />
-                   <div className="absolute inset-0 flex items-center justify-center">
-                     <Camera size={20} />
-                   </div>
-                </div>
-                <div className="text-xs font-bold tracking-widest uppercase opacity-50">Processing...</div>
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/90 text-white z-40 backdrop-blur-sm gap-4">
+                <div className="w-12 h-12 rounded-full border-4 border-kirana-green/20 border-t-kirana-green animate-spin" />
+                <div className="text-sm font-bold tracking-widest uppercase opacity-80">Saving...</div>
               </div>
             )}
-          </div>
-
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-800/20 flex gap-3 max-w-sm">
-             <Zap size={20} className="text-blue-500 shrink-0" />
-             <p className="text-[10px] text-blue-700 dark:text-blue-300 font-bold leading-relaxed">
-               {language === 'hi' 
-                 ? 'टिप: अगर रोशनी कम है, तो स्क्रीन की चमक (Brightness) बढ़ाएं। स्क्रीन की रोशनी आपके चेहरे को पहचान में मदद करेगी।'
-                 : 'Tip: If light is low, increase screen brightness. The screen light will help recognize your face.'}
-             </p>
           </div>
 
           {error && (
             <motion.div
                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-               className="flex flex-col items-center gap-3 bg-red-50 p-4 rounded-2xl border border-red-100"
+               className="flex flex-col items-center gap-3 bg-red-50 p-4 rounded-2xl border border-red-100 w-full max-w-sm"
             >
-              <p className="text-sm text-red-600 font-medium text-center px-4">{error}</p>
-              <Button onClick={() => window.location.reload()} variant="ghost" className="px-3 py-1 text-sm text-red-500 hover:bg-red-100">
-                 <RefreshCcw size={16} className="mr-2" /> Retry Security Check
+              <p className="text-sm text-red-600 font-medium text-center">{error}</p>
+              <Button onClick={retake} variant="ghost" className="px-3 py-1 text-sm text-red-600 hover:bg-red-100 bg-red-100/50">
+                 <RefreshCcw size={16} className="mr-2" /> Retry Camera
               </Button>
             </motion.div>
           )}
@@ -623,28 +491,21 @@ export default function CameraCapture({ shopId, onCapture }: CameraCaptureProps)
           <div className="h-4" />
         </div>
       ) : (
-        <>
-          <div className="w-full max-w-sm">
-            <SecureCanvas
-               image={captured}
-               width={640}
-               height={480}
-               tagline=""
-            />
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-sm flex flex-col gap-4">
+          <div className="rounded-2xl overflow-hidden shadow-xl border-4 border-kirana-green/30 bg-slate-100 relative">
+             <SecureCanvas image={captured} width={480} height={640} tagline="" />
           </div>
-          <p className="text-sm text-kirana-green font-semibold flex items-center gap-2">
-             <div className="p-1 rounded-full bg-kirana-green/10">
-               <CheckCircle size={16} />
-             </div>
+          <div className="bg-kirana-green/10 text-kirana-green px-4 py-3 rounded-xl font-bold flex justify-center items-center gap-2">
+             <CheckCircle size={20} />
              {t('customer.photoTaken')}
-          </p>
+          </div>
           <button
              onClick={retake}
-             className="flex items-center gap-2 text-sm text-slate-500 hover:text-red-500 transition-colors py-2 px-4 rounded-xl border border-dotted border-slate-200"
+             className="flex items-center justify-center gap-2 text-sm font-semibold text-slate-500 hover:text-red-500 transition-colors py-3 px-4 rounded-xl border-2 border-dashed border-slate-300 hover:border-red-300 hover:bg-red-50 w-full"
           >
-             <RefreshCcw size={15} /> {language === 'hi' ? 'साफ फोटो नहीं आई? दोबारा लें' : 'Not clear? Retake'}
+             <RefreshCcw size={18} /> {language === 'hi' ? 'साफ फोटो नहीं आई? दोबारा लें' : 'Not clear? Retake'}
           </button>
-        </>
+        </motion.div>
       )}
     </div>
   );

@@ -184,31 +184,31 @@ export default function KDSView() {
       <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-brand-secondary/5 blur-[120px] rounded-full -ml-40 -mb-40 pointer-events-none" />
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
-      <header className="h-20 flex items-center justify-between px-8 bg-slate-900/40 backdrop-blur-2xl border-b border-white/5 sticky top-0 z-50">
-        <div className="flex items-center gap-6">
+      <header className="h-16 md:h-20 flex items-center justify-between px-4 md:px-8 bg-slate-900/40 backdrop-blur-2xl border-b border-white/5 sticky top-0 z-50">
+        <div className="flex items-center gap-3 md:gap-6">
           <Button 
             variant="ghost" 
             onClick={() => navigate('/shop/dashboard')}
-            className="w-12 h-12 !p-0 !rounded-xl bg-white/5 text-slate-400 hover:text-white"
+            className="w-10 h-10 md:w-12 md:h-12 !p-0 !rounded-xl bg-white/5 text-slate-400 hover:text-white shrink-0"
           >
-            <ArrowLeft size={24} />
+            <ArrowLeft size={20} className="md:w-6 md:h-6" />
           </Button>
-          <div className="flex flex-col">
-            <span className="text-[10px] font-black uppercase text-brand-primary tracking-[0.4em] mb-1 leading-none italic">Omni-Channel Nexus</span>
-            <div className="h-7 flex items-center">
+          <div className="flex flex-col min-w-0">
+            <span className="text-[8px] md:text-[10px] font-black uppercase text-brand-primary tracking-[0.4em] mb-1 leading-none italic hidden sm:block">Omni-Channel Nexus</span>
+            <div className="h-6 md:h-7 flex items-center">
                <SecureCanvas 
                 content={profile?.shopName || 'KITCHEN'} 
-                width={300} 
+                width={200} 
                 height={28} 
-                fontSize={20} 
-                className="border-none bg-transparent" 
+                fontSize={18} 
+                className="border-none bg-transparent max-w-full" 
                 tagline="Force Locked"
               />
             </div>
           </div>
         </div>
         
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4">
           <div className="hidden lg:flex items-center gap-6 mr-6 opacity-40">
              <div className="flex items-center gap-2">
                 <Cpu size={14} className="text-brand-primary" />
@@ -220,30 +220,30 @@ export default function KDSView() {
              </div>
           </div>
 
-          <div className="flex p-1 bg-white/5 border border-white/10 rounded-2xl">
+          <div className="flex p-1 bg-white/5 border border-white/10 rounded-xl md:rounded-2xl shrink-0">
              <Button 
               variant="ghost" 
               onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-              className={`w-12 h-12 !p-0 !rounded-xl transition-all ${viewMode === 'list' ? 'bg-brand-primary text-white shadow-glow-green' : 'text-slate-400'}`}
+              className={`w-10 h-10 md:w-12 md:h-12 !p-0 !rounded-lg md:!rounded-xl transition-all ${viewMode === 'list' ? 'bg-brand-primary text-white shadow-glow-green' : 'text-slate-400'}`}
             >
-              <LayoutList size={20} />
+              <LayoutList size={18} className="md:w-5 md:h-5" />
             </Button>
             <Button 
               variant="ghost" 
               onClick={() => setIsMuted(!isMuted)}
-              className={`w-12 h-12 !p-0 !rounded-xl transition-all ${isMuted ? 'bg-red-500/10 text-red-500' : 'text-slate-400'}`}
+              className={`w-10 h-10 md:w-12 md:h-12 !p-0 !rounded-lg md:!rounded-xl transition-all ${isMuted ? 'bg-red-500/10 text-red-500' : 'text-slate-400'}`}
             >
-              {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+              {isMuted ? <VolumeX size={18} className="md:w-5 md:h-5" /> : <Volume2 size={18} className="md:w-5 md:h-5" />}
             </Button>
             <AnimatePresence>
               {isAudioBlocked && (
                 <motion.button
                   initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
                   onClick={resumeAudio}
-                  className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-xl shadow-lg shadow-brand-primary/20 animate-pulse"
+                  className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-brand-primary text-white rounded-lg md:rounded-xl shadow-lg shadow-brand-primary/20 animate-pulse hidden sm:flex"
                 >
-                  <Volume2 size={16} />
-                  <span className="text-xs font-black uppercase tracking-widest">Enable Sound</span>
+                  <Volume2 size={14} className="md:w-4 md:h-4" />
+                  <span className="text-[10px] md:text-xs font-black uppercase tracking-widest">Enable Sound</span>
                 </motion.button>
               )}
             </AnimatePresence>
@@ -251,9 +251,9 @@ export default function KDSView() {
             <Button 
               variant="ghost" 
               onClick={handleToggleFullscreen}
-              className="w-12 h-12 !p-0 !rounded-xl text-slate-400"
+              className="w-10 h-10 md:w-12 md:h-12 !p-0 !rounded-lg md:!rounded-xl text-slate-400 hidden sm:flex items-center justify-center"
             >
-              <Fullscreen size={20} />
+              <Fullscreen size={18} className="md:w-5 md:h-5" />
             </Button>
             <Button 
                variant="ghost"
@@ -262,24 +262,24 @@ export default function KDSView() {
                    supabase.auth.signOut().then(() => navigate('/shop/login'));
                  }
                }}
-               className="w-12 h-12 !p-0 !rounded-xl text-red-400 hover:bg-red-500/10"
+               className="w-10 h-10 md:w-12 md:h-12 !p-0 !rounded-lg md:!rounded-xl text-red-400 hover:bg-red-500/10"
                title="Emergency Reset/Logout"
             >
-               <Fingerprint size={20} />
+               <Fingerprint size={18} className="md:w-5 md:h-5" />
             </Button>
           </div>
 
-          <div className="h-10 w-px bg-white/5 mx-2" />
+          <div className="h-8 md:h-10 w-px bg-white/5 mx-1 md:mx-2 hidden sm:block" />
           
-          <GlassCard intensity="low" className="flex items-center gap-3 px-6 h-14 border-brand-primary/20">
-            <div className="w-2.5 h-2.5 rounded-full bg-brand-primary shadow-glow-green animate-pulse" />
-            <span className="text-xs font-black text-brand-primary uppercase tracking-[0.2em] italic">{orders.length} Active Payloads</span>
+          <GlassCard intensity="low" className="hidden sm:flex items-center gap-2 md:gap-3 px-4 md:px-6 h-12 md:h-14 border-brand-primary/20">
+            <div className="w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-brand-primary shadow-glow-green animate-pulse" />
+            <span className="text-[10px] md:text-xs font-black text-brand-primary uppercase tracking-[0.2em] italic whitespace-nowrap">{orders.length} Active</span>
           </GlassCard>
         </div>
       </header>
 
       {/* ── Main Content ──────────────────────────────────────────────────── */}
-      <main className="flex-1 p-8 overflow-y-auto">
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto">
         <AnimatePresence mode="popLayout">
           {orders.length === 0 ? (
             <motion.div 
@@ -287,18 +287,18 @@ export default function KDSView() {
               animate={{ opacity: 1, scale: 1 }}
               className="h-[calc(100vh-16rem)] flex flex-col items-center justify-center text-slate-500 text-center"
             >
-              <div className="w-32 h-32 rounded-[3rem] bg-white/5 flex items-center justify-center mb-8 border border-white/5 shadow-inner">
-                <Tv size={56} className="opacity-10 text-brand-primary" />
+              <div className="w-24 h-24 md:w-32 md:h-32 rounded-[2rem] md:rounded-[3rem] bg-white/5 flex items-center justify-center mb-6 md:mb-8 border border-white/5 shadow-inner">
+                <Tv size={48} className="opacity-10 text-brand-primary md:w-[56px] md:h-[56px]" />
               </div>
-              <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter">{t('kds.noOrders')}</h2>
-              <p className="mt-4 text-[10px] font-black uppercase tracking-[0.5em] text-slate-600">Waiting for network transmission...</p>
+              <h2 className="text-2xl md:text-3xl font-black text-white uppercase italic tracking-tighter">{t('kds.noOrders')}</h2>
+              <p className="mt-3 md:mt-4 text-[9px] md:text-[10px] font-black uppercase tracking-[0.5em] text-slate-600">Waiting for network transmission...</p>
             </motion.div>
           ) : (
             <motion.div 
               layout
               className={viewMode === 'grid' 
-                ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-8"
-                : "flex flex-col gap-6 max-w-6xl mx-auto"
+                ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 md:gap-8"
+                : "flex flex-col gap-4 md:gap-6 max-w-6xl mx-auto"
               }
             >
               {orders.map((order) => (
@@ -316,19 +316,19 @@ export default function KDSView() {
       </main>
 
       {/* ── Footer Telemetry ──────────────────────────────────────────────── */}
-      <footer className="h-14 bg-slate-900/60 backdrop-blur-3xl border-t border-white/5 px-8 flex items-center justify-between">
-        <div className="flex gap-10">
-          <div className="flex items-center gap-3">
+      <footer className="h-12 md:h-14 bg-slate-900/60 backdrop-blur-3xl border-t border-white/5 px-4 md:px-8 flex items-center justify-between">
+        <div className="flex gap-4 md:gap-10">
+          <div className="flex items-center gap-2 md:gap-3">
              <div className="w-2 h-2 rounded-full bg-brand-primary shadow-glow-green" />
-             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Live Transmission</span>
+             <span className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest italic whitespace-nowrap">Live Sync</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
              <div className="w-2 h-2 rounded-full bg-brand-secondary shadow-glow-secondary animate-pulse" />
-             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Urgent (+10m)</span>
+             <span className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest italic whitespace-nowrap">Urgent (+10m)</span>
           </div>
         </div>
         
-        <div className="flex items-center gap-6 opacity-30 group hover:opacity-100 transition-opacity">
+        <div className="hidden sm:flex items-center gap-6 opacity-30 group hover:opacity-100 transition-opacity">
            <div className="flex items-center gap-2">
               <ShieldCheck size={12} className="text-brand-primary" />
               <span className="text-[9px] font-black uppercase tracking-widest">End-to-End Encrypted</span>
@@ -368,7 +368,7 @@ function KDSCard({ order, onReady, viewMode, currentTime }: { order: PendingOrde
         } ${viewMode === 'list' ? 'flex-row items-center !h-28' : ''}`}
       >
         {/* Visual Header / Media */}
-        <div className={`shrink-0 overflow-hidden relative shadow-inner ${viewMode === 'list' ? 'w-28 h-full border-r border-white/10' : 'h-48 border-b border-white/10'}`}>
+        <div className={`shrink-0 overflow-hidden relative shadow-inner ${viewMode === 'list' ? 'hidden sm:block w-28 h-full border-r border-white/10' : 'h-40 md:h-48 border-b border-white/10'}`}>
           {order.photoDataUrl ? (
             <SecureCanvas 
               image={order.photoDataUrl} 
@@ -379,7 +379,7 @@ function KDSCard({ order, onReady, viewMode, currentTime }: { order: PendingOrde
             />
           ) : (
             <div className="w-full h-full bg-slate-950 flex items-center justify-center text-white/5">
-              <User size={viewMode === 'list' ? 32 : 64} />
+              <User size={viewMode === 'list' ? 32 : 48} className="md:w-16 md:h-16" />
             </div>
           )}
           
@@ -408,15 +408,15 @@ function KDSCard({ order, onReady, viewMode, currentTime }: { order: PendingOrde
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 flex flex-col p-6 min-w-0">
-          <div className="flex items-start justify-between mb-4">
+        <div className="flex-1 flex flex-col p-4 md:p-6 min-w-0">
+          <div className="flex items-start justify-between mb-3 md:mb-4">
             <div className="min-w-0 flex-1">
-               <div className="h-8 flex items-center opacity-80 group-hover:opacity-100 transition-opacity">
-                  <SecureCanvas content={customerName} width={300} height={32} fontSize={18} className="border-none bg-transparent" />
+               <div className="h-6 md:h-8 flex items-center opacity-80 group-hover:opacity-100 transition-opacity">
+                  <SecureCanvas content={customerName} width={300} height={32} fontSize={16} className="border-none bg-transparent" />
                </div>
-               <div className="flex items-center gap-2 mt-2">
+               <div className="flex items-center gap-1 md:gap-2 mt-1 md:mt-2">
                   <Clock size={12} className={isUrgent ? 'text-brand-secondary' : 'text-slate-500'} />
-                  <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${isUrgent ? 'text-brand-secondary' : 'text-slate-500'}`}>
+                  <span className={`text-[8px] md:text-[9px] font-black uppercase tracking-[0.2em] ${isUrgent ? 'text-brand-secondary' : 'text-slate-500'}`}>
                     {minutesAgo}m Persistence
                   </span>
                </div>
@@ -425,9 +425,9 @@ function KDSCard({ order, onReady, viewMode, currentTime }: { order: PendingOrde
               <Button 
                 onClick={onReady}
                 variant="primary"
-                className="w-14 h-14 !p-0 !rounded-[1.5rem] shadow-glow-green shrink-0 ml-4 group/btn"
+                className="w-12 h-12 md:w-14 md:h-14 !p-0 !rounded-xl md:!rounded-[1.5rem] shadow-glow-green shrink-0 ml-3 md:ml-4 group/btn"
               >
-                <CheckCircle2 size={28} className="group-hover/btn:scale-110 transition-transform" />
+                <CheckCircle2 size={24} className="md:w-7 md:h-7 group-hover/btn:scale-110 transition-transform" />
               </Button>
             )}
           </div>
@@ -448,13 +448,13 @@ function KDSCard({ order, onReady, viewMode, currentTime }: { order: PendingOrde
         </div>
 
         {viewMode === 'list' && (
-          <div className="px-8 shrink-0">
+          <div className="px-4 md:px-8 shrink-0 pb-4 md:pb-0 sm:self-center">
             <Button 
               onClick={onReady}
               variant="primary"
-              className="h-14 px-8 !rounded-2xl shadow-glow-green font-black uppercase italic tracking-widest text-xs"
+              className="w-full sm:w-auto h-12 md:h-14 px-4 md:px-8 !rounded-xl md:!rounded-2xl shadow-glow-green font-black uppercase italic tracking-widest text-[10px] md:text-xs"
             >
-              <CheckCircle2 size={18} className="mr-3" />
+              <CheckCircle2 size={16} className="md:w-[18px] md:h-[18px] mr-2 md:mr-3" />
               Initialize Ready
             </Button>
           </div>
