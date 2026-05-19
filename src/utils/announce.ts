@@ -25,6 +25,7 @@ const KNOWN_ENGLISH = [
 ];
 
 function getBestFemaleVoice(lang: string): SpeechSynthesisVoice | null {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window) || !window.speechSynthesis) return null;
   const voices = window.speechSynthesis.getVoices();
   if (voices.length === 0) return null;
 
@@ -68,7 +69,7 @@ function getBestFemaleVoice(lang: string): SpeechSynthesisVoice | null {
 // ─── Crystal-clear speak function ───────────────────────────────────────
 
 function speakClear(text: string) {
-  if (!('speechSynthesis' in window)) return;
+  if (typeof window === 'undefined' || !('speechSynthesis' in window) || !window.speechSynthesis) return;
   if (localStorage.getItem('voice_muted') === 'true') return;
 
   const synth = window.speechSynthesis;

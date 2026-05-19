@@ -48,6 +48,7 @@ import LanguageSwitcher from '../../components/ui/LanguageSwitcher';
 import AdBanner from '../../components/ui/AdBanner';
 import SessionManager from '../../components/settings/SessionManager';
 import ShopTutorial from '../../components/shopkeeper/ShopTutorial';
+import SubscriptionBanner from '../../components/shop/SubscriptionBanner';
 import { HelpCircle } from 'lucide-react';
 
 const SpeechRecognition =
@@ -914,9 +915,23 @@ export default function Dashboard() {
           </nav>
         </div>
 
-        <main className="flex-1 overflow-y-auto px-4 pb-24 relative z-10">
-          <div className="max-w-xl mx-auto py-4">
-              {/* Premium Dashboard Stats */}
+        <main className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8">
+          <div className="max-w-7xl mx-auto space-y-8">
+            {/* Subscription Logic & Banner */}
+            {!subLoading && (
+              <SubscriptionBanner 
+                status={
+                  !subscription ? 'free' :
+                  subscription.status === 'expired' ? 'expired' :
+                  (subscription.expiry_date && (new Date(subscription.expiry_date).getTime() - new Date().getTime()) < 3 * 24 * 60 * 60 * 1000) ? 'expiring' :
+                  'active'
+                }
+                planName={subscription?.plan?.name || 'Free'}
+                daysRemaining={subscription?.expiry_date ? Math.max(0, Math.ceil((new Date(subscription.expiry_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : undefined}
+              />
+            )}
+
+            {/* Quick Stats Header */}
               {!subLoading && (
                 <div className="grid grid-cols-2 gap-4 mb-6">
                   <GlassCard intensity="high" className="p-4 md:p-6 relative overflow-hidden group">

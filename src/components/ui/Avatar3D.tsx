@@ -2,7 +2,7 @@ import { useRef, useMemo, useState, useEffect, Suspense } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
-import { useTalkingCharacter } from '../../context/TalkingCharacterContext';
+
 
 const AVATAR_URL = 'https://models.readyplayer.me/6584288018e69818816827a5.glb?morphTargets=ARKit,Oculus%20Visemes';
 
@@ -10,7 +10,7 @@ function AvatarRemote() {
   const group = useRef<THREE.Group>(null);
   const { nodes, materials, animations } = useGLTF(AVATAR_URL) as any;
   const { actions, names } = useAnimations(animations, group);
-  const { isSpeaking } = useTalkingCharacter();
+  const isSpeaking = false;
 
   const headMesh = useMemo(() => {
     let mesh: any = null;
@@ -86,7 +86,7 @@ function AvatarFallback() {
   const headRef = useRef<THREE.Group>(null);
   const mouthRef = useRef<THREE.Mesh>(null);
   const bodyRef = useRef<THREE.Group>(null);
-  const { isSpeaking } = useTalkingCharacter();
+  const isSpeaking = false; // Dummy
 
   useFrame((state) => {
     const time = state.clock.elapsedTime;

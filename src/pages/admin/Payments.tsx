@@ -12,7 +12,12 @@ import {
   ArrowUpRight,
   TrendingUp,
   Receipt,
-  Fingerprint
+  Fingerprint,
+  IndianRupee,
+  Users,
+  Zap,
+  RefreshCw,
+  Activity
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -34,11 +39,23 @@ interface PendingPayment {
   created_at: string;
   confirmed_at?: string;
   payment_proof_url?: string;
+  razorpay_order_id?: string;
+  razorpay_payment_id?: string;
+  payment_method?: string;
+  gateway_fee?: number;
+  net_amount?: number;
   shop: { shop_name: string; shop_id: string };
   plan: { 
     name: string; 
     duration_days: number; 
   };
+}
+
+interface RevenueMetrics {
+  mrr: number;
+  totalRazorpayRevenue: number;
+  activeSubscribers: number;
+  pendingManual: number;
 }
 
 export default function AdminPayments() {
@@ -47,9 +64,15 @@ export default function AdminPayments() {
   const location = useLocation();
   const [payments, setPayments] = useState<PendingPayment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'pending' | 'history'>(
+  const [activeTab, setActiveTab] = useState<'pending' | 'razorpay' | 'history'>(
     (location.state as any)?.tab || 'pending'
   );
+  const [metrics, setMetrics] = useState<RevenueMetrics>({
+    mrr: 0,
+    totalRazorpayRevenue: 0,
+    activeSubscribers: 0,
+    pendingManual: 0,
+  });
 
   const [confirmingPayment, setConfirmingPayment] = useState<PendingPayment | null>(null);
   const [confirmForm, setConfirmForm] = useState({
@@ -59,6 +82,31 @@ export default function AdminPayments() {
   });
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBankVerified, setIsBankVerified] = useState(false);
+
+  // Fetch Revenue Metrics
+  const fetchMetrics = useCallback(async () => {
+    try {
+      const [activeSubs, razorpayPaid, pendingPayments] = await Promise.all([
+        supabase.from('subscriptions').select('id, plan:plans(monthly_price)', { count: 'exact' }).eq('status', 'active'),
+        supabase.from('payments').select('amount, gateway_fee, net_amount').eq('status', 'razorpay_paid'),
+        supabase.from('payments').select('id', { count: 'exact' }).eq('status', 'pending'),
+      ]);
+
+      const activeCount = activeSubs.count || 0;
+      const mrrCalc = (activeSubs.data || []).reduce((sum: number, s: any) => sum + (s.plan?.monthly_price || 0), 0);
+      const razorpayTotal = (razorpayPaid.data || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+      const pendingCount = pendingPayments.count || 0;
+
+      setMetrics({
+        mrr: mrrCalc,
+        totalRazorpayRevenue: razorpayTotal,
+        activeSubscribers: activeCount,
+        pendingManual: pendingCount,
+      });
+    } catch (err) {
+      console.error('Metrics fetch error:', err);
+    }
+  }, []);
 
   const fetchPayments = useCallback(async () => {
     setLoading(true);
@@ -75,6 +123,18 @@ export default function AdminPayments() {
         
         if (error) throw error;
         setPayments(historyData as any[]);
+        return;
+      }
+
+      if (activeTab === 'razorpay') {
+        const { data: razorpayData, error } = await supabase
+          .from('payments')
+          .select('*, shop:shops_profile(shop_name, shop_id), plan:plans(name, duration_days)')
+          .eq('payment_method', 'razorpay')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setPayments(razorpayData as any[]);
         return;
       }
 
@@ -115,15 +175,16 @@ export default function AdminPayments() {
 
   useEffect(() => {
     fetchPayments();
+    fetchMetrics();
 
     const channel = supabase.channel('admin-payments-sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => fetchPayments())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_history' }, () => fetchPayments())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => fetchPayments())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => { fetchPayments(); fetchMetrics(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_history' }, () => { fetchPayments(); fetchMetrics(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subscriptions' }, () => { fetchPayments(); fetchMetrics(); })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [fetchPayments]);
+  }, [fetchPayments, fetchMetrics]);
 
   const openConfirmModal = (payment: PendingPayment) => {
     setConfirmingPayment(payment);
@@ -184,6 +245,18 @@ export default function AdminPayments() {
     }
   };
 
+  const getStatusConfig = (status: string) => {
+    switch(status) {
+      case 'razorpay_paid': return { label: 'AUTO-PAID', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: <Zap size={14} /> };
+      case 'razorpay_created': return { label: 'INITIATED', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', icon: <Activity size={14} /> };
+      case 'razorpay_failed': return { label: 'FAILED', color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', icon: <Ban size={14} /> };
+      case 'refunded': return { label: 'REFUNDED', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: <RefreshCw size={14} /> };
+      case 'confirmed': return { label: 'CONFIRMED', color: 'text-brand-primary', bg: 'bg-brand-primary/10', border: 'border-brand-primary/20', icon: <ShieldCheck size={14} /> };
+      case 'pending': return { label: 'PENDING', color: 'text-brand-secondary', bg: 'bg-brand-secondary/10', border: 'border-brand-secondary/20', icon: <Clock size={14} /> };
+      default: return { label: status.toUpperCase(), color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/20', icon: <Clock size={14} /> };
+    }
+  };
+
   return (
     <div className="space-y-10 pb-10">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -197,24 +270,81 @@ export default function AdminPayments() {
            </motion.h1>
            <p className="text-slate-500 font-bold uppercase tracking-[0.2em] text-[10px] mt-3 flex items-center gap-2">
              <TrendingUp size={12} className="text-brand-primary" />
-             Transaction Streams & Activation Center
+             Revenue Intelligence & Transaction Streams
            </p>
         </div>
 
         <div className="flex p-1.5 bg-white/40 dark:bg-slate-950/40 backdrop-blur-xl border border-white/20 dark:border-white/5 rounded-2xl shadow-inner w-fit">
           <button 
             onClick={() => setActiveTab('pending')}
-            className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'pending' ? 'bg-brand-primary text-white shadow-glow-green font-black' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}
+            className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'pending' ? 'bg-brand-primary text-white shadow-glow-green font-black' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}
           >
-            Pending
+            Pending {metrics.pendingManual > 0 && <span className="ml-1 px-2 py-0.5 bg-red-500 text-white rounded-full text-[8px]">{metrics.pendingManual}</span>}
+          </button>
+          <button 
+            onClick={() => setActiveTab('razorpay')}
+            className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'razorpay' ? 'bg-brand-primary text-white shadow-glow-green font-black' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}
+          >
+            Razorpay
           </button>
           <button 
             onClick={() => setActiveTab('history')}
-            className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'history' ? 'bg-brand-primary text-white shadow-glow-green font-black' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}
+            className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'history' ? 'bg-brand-primary text-white shadow-glow-green font-black' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}
           >
             Confirmed
           </button>
         </div>
+      </div>
+
+      {/* Revenue Metrics Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <GlassCard intensity="low" className="p-6 border-white/10 relative overflow-hidden group">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary">
+              <IndianRupee size={18} />
+            </div>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">MRR</p>
+          </div>
+          <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter italic">₹{metrics.mrr.toLocaleString('en-IN')}</p>
+          <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-2 italic">Monthly Recurring Revenue</p>
+          <div className="absolute top-0 right-0 w-20 h-full bg-brand-primary/5 blur-[40px] -z-10" />
+        </GlassCard>
+
+        <GlassCard intensity="low" className="p-6 border-white/10 relative overflow-hidden group">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+              <Zap size={18} />
+            </div>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">Razorpay</p>
+          </div>
+          <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter italic">₹{metrics.totalRazorpayRevenue.toLocaleString('en-IN')}</p>
+          <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-2 italic">Auto-Collected Revenue</p>
+          <div className="absolute top-0 right-0 w-20 h-full bg-emerald-500/5 blur-[40px] -z-10" />
+        </GlassCard>
+
+        <GlassCard intensity="low" className="p-6 border-white/10 relative overflow-hidden group">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+              <Users size={18} />
+            </div>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">Active</p>
+          </div>
+          <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter italic">{metrics.activeSubscribers}</p>
+          <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-2 italic">Active Subscribers</p>
+          <div className="absolute top-0 right-0 w-20 h-full bg-blue-500/5 blur-[40px] -z-10" />
+        </GlassCard>
+
+        <GlassCard intensity="low" className="p-6 border-white/10 relative overflow-hidden group">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+              <Clock size={18} />
+            </div>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">Pending</p>
+          </div>
+          <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter italic">{metrics.pendingManual}</p>
+          <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-2 italic">Manual Verifications</p>
+          <div className="absolute top-0 right-0 w-20 h-full bg-amber-500/5 blur-[40px] -z-10" />
+        </GlassCard>
       </div>
 
       {loading ? (
@@ -260,11 +390,22 @@ export default function AdminPayments() {
                   </div>
 
                   <div className="mt-6 md:mt-0 flex items-center gap-10 lg:gap-16">
+                     {/* Status Badge */}
+                     {activeTab === 'razorpay' && (() => {
+                       const sc = getStatusConfig(payment.status);
+                       return (
+                         <div className={`hidden md:flex items-center gap-2 px-4 py-2 rounded-xl ${sc.bg} border ${sc.border}`}>
+                           <span className={sc.color}>{sc.icon}</span>
+                           <span className={`text-[9px] font-black uppercase tracking-widest ${sc.color}`}>{sc.label}</span>
+                         </div>
+                       );
+                     })()}
+
                      <div className="text-right hidden lg:block">
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center justify-end gap-2">
-                           <Fingerprint size={10} /> Transmission Hash
+                           <Fingerprint size={10} /> {payment.razorpay_payment_id ? 'Razorpay ID' : 'Transmission Hash'}
                         </p>
-                        <p className="text-xs font-mono font-black text-slate-800 dark:text-slate-200 tracking-tighter">{payment.utr || (payment as any).payment_method || 'ANONYMOUS'}</p>
+                        <p className="text-xs font-mono font-black text-slate-800 dark:text-slate-200 tracking-tighter">{payment.razorpay_payment_id || payment.utr || (payment as any).payment_method || 'ANONYMOUS'}</p>
                      </div>
                      
                      <div className="text-right">

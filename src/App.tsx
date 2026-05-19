@@ -7,7 +7,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { SubscriptionProvider } from './context/SubscriptionContext';
 import { VoiceProvider } from './context/VoiceContext';
-// import { TalkingCharacterProvider } from './context/TalkingCharacterContext';
+
 
 // ─── Shared Components & Guards ──────────────────────────────────────────
 import Loader from './components/ui/Loader';
@@ -16,7 +16,7 @@ import OfflineBanner from './components/ui/OfflineBanner';
 import InstallPrompt from './components/ui/InstallPrompt';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AdminProtectedRoute from './components/admin/AdminProtectedRoute';
-// import TalkingCharacter from './components/ui/TalkingCharacter';
+
 
 import Login from './pages/shop/Login';
 import Register from './pages/shop/Register';
@@ -67,7 +67,6 @@ function GlobalUI({ children }: { children: React.ReactNode }) {
       <SecurityManager />
       <OfflineBanner />
       <InstallPrompt />
-      {/* <TalkingCharacter /> */}
       <div id="app-background" aria-hidden="true" />
       {children}
     </>
@@ -134,9 +133,7 @@ function App() {
           <VoiceProvider>
             <AuthProvider>
               <SubscriptionProvider>
-                {/* <TalkingCharacterProvider> */}
-                  <AppContent />
-                {/* </TalkingCharacterProvider> */}
+                <AppContent />
               </SubscriptionProvider>
             </AuthProvider>
           </VoiceProvider>

@@ -3,14 +3,16 @@ import { supabase } from '../../lib/supabase';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import { Link, useNavigate } from 'react-router-dom';
-import { Phone, Sparkles, UserPlus, Zap, ArrowRight, ShieldCheck, ArrowLeft, Shield } from 'lucide-react';
+import { Phone, Mail, Sparkles, UserPlus, Zap, ShieldCheck, ArrowLeft, Shield } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import LanguageSwitcher from '../../components/ui/LanguageSwitcher';
 import { motion, AnimatePresence } from 'framer-motion';
 import GlassCard from '../../components/ui/GlassCard';
 
 export default function Register() {
+  const [tab, setTab] = useState<'phone' | 'email'>('phone');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -27,7 +29,8 @@ export default function Register() {
   }, [otpCooldown]);
 
   const handleSendOTP = async () => {
-    if (!phone || phone.length < 10) {
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length < 10) {
       setError('Please enter a valid 10-digit mobile number');
       return;
     }
@@ -49,7 +52,8 @@ export default function Register() {
   };
 
   const handleVerifyOTP = async () => {
-    if (!otp || otp.length !== 6) {
+    const cleanOtp = otp.replace(/\D/g, '');
+    if (!cleanOtp || cleanOtp.length !== 6) {
       setError('Please enter a valid 6-digit OTP');
       return;
     }
@@ -72,6 +76,18 @@ export default function Register() {
         navigate('/shop/setup');
       }
     }
+    setLoading(false);
+  };
+
+  const handleEmailRegister = async () => {
+    if (!email) {
+      setError('Please enter a valid email address');
+      return;
+    }
+    setLoading(true); setError(''); setMessage('');
+    const { error } = await supabase.auth.signInWithOtp({ email });
+    if (error) setError(error.message);
+    else setMessage('Magic link sent! Check your inbox to complete registration.');
     setLoading(false);
   };
 
@@ -114,6 +130,17 @@ export default function Register() {
              </div>
           </div>
           
+          <div className="flex p-1.5 bg-white/40 dark:bg-slate-950/40 backdrop-blur-xl border border-white/20 dark:border-white/5 rounded-2xl shadow-inner mb-8">
+            <button 
+              className={`flex-1 py-3 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${tab === 'phone' ? 'bg-brand-primary text-white shadow-glow-green' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}
+              onClick={() => { setTab('phone'); setOtpSent(false); setError(''); setMessage(''); }}
+            >Phone</button>
+            <button 
+              className={`flex-1 py-3 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${tab === 'email' ? 'bg-brand-primary text-white shadow-glow-green' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}
+              onClick={() => { setTab('email'); setError(''); setMessage(''); }}
+            >Email</button>
+          </div>
+
           <AnimatePresence mode="wait">
             {error && (
               <motion.div 
@@ -138,27 +165,44 @@ export default function Register() {
           </AnimatePresence>
 
           <div className="space-y-6">
-            <Input 
-              label="Mobile Number" 
-              type="tel" 
-              value={phone} 
-              onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} 
-              icon={<Phone size={18} className="text-brand-primary" />} 
-              placeholder="9876543210"
-              disabled={otpSent}
-              className="bg-white/10 border-white/10 focus:border-brand-primary transition-all text-xs font-bold tracking-widest"
-              labelClassName="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 ml-1"
-            />
+            {tab === 'phone' && (
+              <>
+                <Input 
+                  label="Mobile Number" 
+                  type="tel" 
+                  value={phone} 
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} 
+                  icon={<Phone size={18} className="text-brand-primary" />} 
+                  placeholder="9876543210"
+                  disabled={otpSent}
+                  className="bg-white/10 border-white/10 focus:border-brand-primary transition-all text-xs font-bold tracking-widest"
+                  labelClassName="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 ml-1"
+                />
 
-            {otpSent && (
+                {otpSent && (
+                  <Input 
+                    label="Verification Code" 
+                    type="text" 
+                    value={otp} 
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} 
+                    placeholder="X X X X X X"
+                    className="bg-white/10 border-white/10 focus:border-brand-primary transition-all text-center text-lg font-black tracking-[1em]"
+                    labelClassName="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 ml-1 text-center"
+                  />
+                )}
+              </>
+            )}
+
+            {tab === 'email' && (
               <Input 
-                label="Verification Code (OTP)" 
-                type="text" 
-                value={otp} 
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} 
-                placeholder="X X X X X X"
-                className="bg-white/10 border-white/10 focus:border-brand-primary transition-all text-center text-lg font-black tracking-[1em]"
-                labelClassName="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 ml-1 text-center"
+                label="Email Address" 
+                type="email" 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
+                icon={<Mail size={18} className="text-brand-primary" />} 
+                placeholder="owner@nexus.com"
+                className="bg-white/10 border-white/10 focus:border-brand-primary transition-all text-xs font-bold tracking-widest"
+                labelClassName="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 ml-1"
               />
             )}
 
@@ -172,34 +216,30 @@ export default function Register() {
             </div>
 
             <div className="pt-4">
-              {!otpSent ? (
-                <Button 
-                  className="w-full h-16 !rounded-2xl shadow-glow-green text-sm font-black uppercase tracking-widest italic group" 
-                  onClick={handleSendOTP} 
-                  isLoading={loading}
-                >
-                  Send OTP
-                  <ArrowRight size={18} className="ml-2 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  <Button 
-                    className="w-full h-16 !rounded-2xl shadow-glow-green text-sm font-black uppercase tracking-widest italic group" 
-                    onClick={handleVerifyOTP} 
-                    isLoading={loading}
-                  >
-                    Verify & Create Shop
-                    <Shield size={18} className="ml-2" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    className="w-full h-12 !rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white"
-                    onClick={handleSendOTP}
-                    disabled={otpCooldown > 0 || loading}
-                  >
-                    {otpCooldown > 0 ? `Resend OTP in ${otpCooldown}s` : 'Resend OTP'}
-                  </Button>
-                </div>
+              {tab === 'phone' && !otpSent && (
+                 <Button className="w-full h-16 !rounded-2xl shadow-glow-green text-sm font-black uppercase tracking-widest italic group" onClick={handleSendOTP} isLoading={loading}>
+                   Send OTP <Zap size={18} className="ml-2 group-hover:translate-x-1 transition-transform" />
+                 </Button>
+              )}
+              {tab === 'phone' && otpSent && (
+                 <div className="flex flex-col gap-3">
+                   <Button className="w-full h-16 !rounded-2xl shadow-glow-green text-sm font-black uppercase tracking-widest italic group" onClick={handleVerifyOTP} isLoading={loading}>
+                     Verify & Create Shop <Shield size={18} className="ml-2" />
+                   </Button>
+                   <Button 
+                      variant="ghost" 
+                      className="w-full h-12 !rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white"
+                      onClick={handleSendOTP}
+                      disabled={otpCooldown > 0 || loading}
+                    >
+                      {otpCooldown > 0 ? `Resend OTP in ${otpCooldown}s` : 'Resend OTP'}
+                    </Button>
+                 </div>
+              )}
+              {tab === 'email' && (
+                 <Button className="w-full h-16 !rounded-2xl shadow-glow-green text-sm font-black uppercase tracking-widest italic group" onClick={handleEmailRegister} isLoading={loading}>
+                   Register with Email <Sparkles size={18} className="ml-2 group-hover:scale-110 transition-transform" />
+                 </Button>
               )}
             </div>
           </div>

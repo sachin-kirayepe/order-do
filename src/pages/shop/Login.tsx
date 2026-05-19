@@ -11,11 +11,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import GlassCard from '../../components/ui/GlassCard';
 
 export default function Login() {
+  const [tab, setTab] = useState<'phone' | 'email' | 'admin'>('phone');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
-  const [tab, setTab] = useState<'phone' | 'admin'>('phone');
   const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [error, setError] = useState('');
@@ -84,6 +84,18 @@ export default function Login() {
     setLoading(false);
   };
 
+  const handleEmailLogin = async () => {
+    if (!email) {
+      setError('Please enter a valid email address');
+      return;
+    }
+    setLoading(true); setError(''); setMessage('');
+    const { error } = await supabase.auth.signInWithOtp({ email });
+    if (error) setError(error.message);
+    else setMessage('Magic link sent! Check your inbox.');
+    setLoading(false);
+  };
+
   const handlePasswordLogin = async () => {
     setLoading(true); setError('');
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -139,7 +151,11 @@ export default function Login() {
             <button 
               className={`flex-1 py-3 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${tab === 'phone' ? 'bg-brand-primary text-white shadow-glow-green' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}
               onClick={() => { setTab('phone'); setOtpSent(false); setError(''); setMessage(''); }}
-            >Shop Login</button>
+            >Phone</button>
+            <button 
+              className={`flex-1 py-3 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${tab === 'email' ? 'bg-brand-primary text-white shadow-glow-green' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}
+              onClick={() => { setTab('email'); setError(''); setMessage(''); }}
+            >Email</button>
             <button 
               className={`flex-1 py-3 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${tab === 'admin' ? 'bg-brand-primary text-white shadow-glow-green' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}
               onClick={() => { setTab('admin'); setError(''); setMessage(''); }}
@@ -196,6 +212,19 @@ export default function Login() {
                   />
                 )}
               </>
+            )}
+
+            {tab === 'email' && (
+              <Input 
+                label="Email Address" 
+                type="email" 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
+                icon={<Mail size={18} className="text-brand-primary" />} 
+                placeholder="shop@nexus.com"
+                className="bg-white/10 border-white/10 focus:border-brand-primary transition-all text-xs font-bold tracking-widest"
+                labelClassName="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 ml-1"
+              />
             )}
 
             {tab === 'admin' && (
@@ -258,6 +287,11 @@ export default function Login() {
                       {otpCooldown > 0 ? `Resend OTP in ${otpCooldown}s` : 'Resend OTP'}
                     </Button>
                  </div>
+              )}
+              {tab === 'email' && (
+                 <Button className="w-full h-16 !rounded-2xl shadow-glow-green text-sm font-black uppercase tracking-widest italic group" onClick={handleEmailLogin} isLoading={loading}>
+                   Send Magic Link <Sparkles size={18} className="ml-2 group-hover:scale-110 transition-transform" />
+                 </Button>
               )}
             </div>
           </div>

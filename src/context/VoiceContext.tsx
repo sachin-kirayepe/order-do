@@ -149,20 +149,30 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     return localStorage.getItem('voice_selected_name') || '';
   });
 
-  const synth = window.speechSynthesis;
+  const synth = typeof window !== 'undefined' && 'speechSynthesis' in window ? window.speechSynthesis : null;
   const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   const loadVoices = useCallback(() => {
-    const v = synth.getVoices();
-    voicesRef.current = v;
-    setAvailableVoices(v);
+    if (!synth) return;
+    try {
+      const v = synth.getVoices();
+      voicesRef.current = v;
+      setAvailableVoices(v);
+    } catch (err) {
+      console.warn('[Voice] Failed to load voices:', err);
+    }
   }, [synth]);
 
   useEffect(() => {
+    if (!synth) return;
     loadVoices();
-    if (synth.onvoiceschanged !== undefined) {
-      synth.onvoiceschanged = loadVoices;
+    try {
+      if (synth.onvoiceschanged !== undefined) {
+        synth.onvoiceschanged = loadVoices;
+      }
+    } catch (err) {
+      console.warn('[Voice] Failed to bind onvoiceschanged:', err);
     }
   }, [synth, loadVoices]);
 
@@ -221,15 +231,25 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   const setMuted = (muted: boolean) => {
     setIsMuted(muted);
     localStorage.setItem('voice_muted', String(muted));
-    if (muted) synth.cancel();
+    if (muted && synth) {
+      try {
+        synth.cancel();
+      } catch (err) {
+        console.warn('[Voice] Cancel failed:', err);
+      }
+    }
   };
 
   // ─── Core speak function — uses custom tone values ────────────────
   const speakText = useCallback((text: string) => {
     try {
-      if (!text || !('speechSynthesis' in window)) return;
+      if (!text || !synth) return;
 
-      synth.cancel();
+      try {
+        synth.cancel();
+      } catch (err) {
+        console.warn('[Voice] Cancel before speak failed:', err);
+      }
 
       const isDevanagari = /[\u0900-\u097F]/.test(text);
       let lang = 'en-US';
@@ -327,7 +347,13 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   }, [isMuted, region, speakText]);
 
   const stop = useCallback(() => {
-    synth.cancel();
+    if (synth) {
+      try {
+        synth.cancel();
+      } catch (err) {
+        console.warn('[Voice] Cancel failed:', err);
+      }
+    }
     setIsSpeaking(false);
   }, [synth]);
 

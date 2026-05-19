@@ -1,17 +1,19 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import { isExpired } from '../utils/dateUtils';
+
+interface PlanData {
+  id: number;
+  name: string;
+  features: Record<string, boolean>;
+}
 
 interface Subscription {
   status: 'active' | 'expired' | 'pending';
   expiry_date: string | null;
   confirmed_at: string | null;
-  plan: {
-    id: number;
-    name: string;
-    features: Record<string, boolean>;
-  };
+  plan: PlanData;
 }
 
 interface SubscriptionContextType {
@@ -37,7 +39,7 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
   const [globalFree, setGlobalFree] = useState(false);
   const subscriptionRef = useRef<Subscription | null>(null);
 
-  const fetchSubscription = async () => {
+  const fetchSubscription = useCallback(async () => {
     if (!user) {
       setSubscription(null);
       setLoading(false);
@@ -45,15 +47,7 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
     }
 
     try {
-      // 1. Validate UUID format to prevent database crash
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(user.id)) {
-        setSubscription(null);
-        setLoading(false);
-        return;
-      }
-
-      // 2. Fetch Global Settings
+      // 1. Fetch Global Settings
       const { data: settings } = await supabase
         .from('admin_settings')
         .select('value')
@@ -62,7 +56,7 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
       
       setGlobalFree(settings?.value === true || settings?.value === 'true');
 
-      // 3. Fetch Shop Subscription and Server Time
+      // 2. Fetch Shop Subscription and Server Time
       const [subResult, timeResult] = await Promise.all([
         supabase
           .from('subscriptions')
@@ -80,14 +74,20 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
       const serverNow = timeResult.data ? new Date(timeResult.data) : new Date();
 
       if (subData && (subData.status === 'active' || subData.status === 'expired')) {
-        // Double check status based on server time
         const actualStatus = (subData.status === 'active' && isExpired(subData.expiry_date, serverNow)) 
           ? 'expired' 
           : subData.status;
 
-        setSubscription({ ...subData, status: actualStatus } as any);
+        // Supabase returns plan as object from the join
+        const planData = (Array.isArray(subData.plan) ? subData.plan[0] : subData.plan) as PlanData;
+        setSubscription({
+          status: actualStatus as Subscription['status'],
+          expiry_date: subData.expiry_date,
+          confirmed_at: null,
+          plan: planData,
+        });
       } else {
-        // Check for a pending payment request to show "Selected Plan"
+        // Check for pending payment
         const { data: pendingPayment } = await supabase
           .from('payments')
           .select('plan:plans(id, name, features)')
@@ -98,40 +98,32 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
           .maybeSingle();
 
         if (pendingPayment) {
+          const pendingPlan = (Array.isArray(pendingPayment.plan) ? pendingPayment.plan[0] : pendingPayment.plan) as PlanData;
           setSubscription({
             status: 'pending',
             expiry_date: null,
             confirmed_at: null,
-            plan: pendingPayment.plan as any
+            plan: pendingPlan,
+          });
+        } else if (subData) {
+          const fallbackPlan = (Array.isArray(subData.plan) ? subData.plan[0] : subData.plan) as PlanData;
+          setSubscription({
+            status: subData.status as Subscription['status'],
+            expiry_date: subData.expiry_date,
+            confirmed_at: null,
+            plan: fallbackPlan,
           });
         } else {
-          setSubscription(subData as any || null);
-        }
-      }
-
-      // 4. Fetch Activation Timestamp for active subscriptions from payment_history
-      if (subData && subData.status === 'active') {
-        const { data: activatedRecord } = await supabase
-          .from('payment_history')
-          .select('confirmed_at')
-          .eq('shop_id', user.id)
-          .eq('status', 'confirmed')
-          .order('confirmed_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (activatedRecord) {
-          setSubscription(prev => prev ? { ...prev, confirmed_at: activatedRecord.confirmed_at } : null);
+          setSubscription(null);
         }
       }
     } catch (err) {
-      console.error('Error fetching subscription:', err);
+      console.error('[SubscriptionContext] Fetch Error:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
-  // TC-015: Keep ref in sync with state for heartbeat access
   useEffect(() => {
     subscriptionRef.current = subscription;
   }, [subscription]);
@@ -141,72 +133,32 @@ export const SubscriptionProvider = ({ children }: { children: React.ReactNode }
 
     if (!user) return;
 
-    // TC-015 FIX: Heartbeat uses ref to avoid stale closure
-    // Always re-fetch from server to get fresh expiry state
-    const heartbeat = setInterval(() => {
-      const current = subscriptionRef.current;
-      if (current?.expiry_date && isExpired(current.expiry_date)) {
-        console.log('[SubscriptionContext] Heartbeat detected expiration');
-        fetchSubscription(); // Refresh state to lock UI
-      }
-    }, 60000);
-
-    // Listen for realtime updates to this shop's subscription or payments
-    const channel = supabase.channel(`shop-sub-${user.id}`)
+    const channel = supabase.channel(`sub-sync-${user.id}`)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'subscriptions',
         filter: `shop_id=eq.${user.id}`
-      }, () => {
-        console.log('[SubscriptionContext] Realtime Update detected (subscriptions)');
-        fetchSubscription();
-      })
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'payment_history',
-        filter: `shop_id=eq.${user.id}`
-      }, () => {
-        console.log('[SubscriptionContext] Realtime Update detected (payment_history)');
-        fetchSubscription();
-      })
+      }, () => fetchSubscription())
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'payments',
         filter: `shop_id=eq.${user.id}`
-      }, () => {
-        console.log('[SubscriptionContext] Realtime Update detected (payments pool)');
-        fetchSubscription();
-      })
+      }, () => fetchSubscription())
       .subscribe();
 
     return () => {
-      clearInterval(heartbeat);
       supabase.removeChannel(channel);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, fetchSubscription]);
 
-  const hasFeature = (featureId: string) => {
-    // Admin always has all features
-    if (isAdmin) return true;
-    
-    // Global Free Toggle
-    if (globalFree) return true;
-
-    // Check Subscription
+  const hasFeature = useCallback((featureId: string) => {
+    if (isAdmin || globalFree) return true;
     if (!subscription || subscription.status !== 'active') return false;
-
-    // Check if expiry date has passed
-    if (isExpired(subscription.expiry_date)) {
-      return false;
-    }
-
-    // Check plan features
+    if (isExpired(subscription.expiry_date)) return false;
     return subscription.plan.features[featureId] === true;
-  };
+  }, [isAdmin, globalFree, subscription]);
 
   return (
     <SubscriptionContext.Provider value={{ 

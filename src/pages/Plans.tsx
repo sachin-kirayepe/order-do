@@ -11,21 +11,19 @@ import {
   CreditCard,
   IndianRupee,
   X,
-  Copy,
   Zap,
   Cpu,
   Fingerprint,
-  Radio,
   ArrowRight,
-  Camera,
-  Image as ImageIcon
+  Shield
 } from 'lucide-react';
 import Button from '../components/ui/Button';
-import Input from '../components/ui/Input';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import GlassCard from '../components/ui/GlassCard';
+import { initializeRazorpayPayment } from '../lib/razorpay';
+import { RAZORPAY_CONFIG } from '../lib/razorpay-config';
 
 interface Plan {
   id: number;
@@ -66,8 +64,6 @@ export default function Plans() {
   
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [paymentType, setPaymentType] = useState<'monthly' | 'yearly'>('monthly');
-  const [utr, setUtr] = useState('');
-  const [proofImage, setProofImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -89,57 +85,75 @@ export default function Plans() {
     fetchPlans();
   }, []);
 
-  const handlePurchase = async () => {
+  const handleRazorpayPayment = async () => {
     if (!user) {
       toast.error('GUEST ACCESS: Please authorize as a shopkeeper first');
       navigate('/shop/login');
       return;
     }
 
-    if (!utr.trim()) {
-      toast.error('PROTOCOL ERROR: Mandatory UTR telemetry missing');
-      return;
-    }
-
-    if (!proofImage) {
-      toast.error('VERIFICATION ERROR: Payment screenshot required');
-      return;
-    }
+    if (!selectedPlan) return;
 
     setIsSubmitting(true);
     try {
-      const { data: shopProfile } = await supabase
-        .from('shops_profile')
-        .select('id')
-        .eq('id', user.id)
-        .single();
+      // 1. Create Order via Edge Function
+      const { data: orderData, error: orderError } = await supabase.functions.invoke('create-razorpay-order', {
+        body: { 
+          plan_id: selectedPlan.id, 
+          payment_type: paymentType 
+        }
+      });
 
-      if (!shopProfile) {
-        toast.error('NODE NOT FOUND: Complete shop initialization first.');
-        setIsSubmitting(false);
-        return;
-      }
+      if (orderError) throw orderError;
 
-      const { error } = await supabase.from('payments').insert([{
-        shop_id: user.id,
-        plan_id: selectedPlan?.id,
-        amount: paymentType === 'monthly' ? selectedPlan?.monthly_price : selectedPlan?.yearly_price,
-        duration_days: paymentType === 'monthly' ? 30 : 365,
-        utr: utr.trim(),
-        payment_proof_url: proofImage,
-        status: 'pending'
-      }]);
+      // 2. Initialize Razorpay Checkout
+      const options = {
+        key: RAZORPAY_CONFIG.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: RAZORPAY_CONFIG.companyName,
+        description: `${selectedPlan.name} Plan - ${paymentType.toUpperCase()}`,
+        order_id: orderData.id,
+        handler: async (response: any) => {
+          try {
+            toast.loading('VERIFYING SETTLEMENT...');
+            
+            // 3. Verify Payment via Edge Function
+            const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-razorpay-payment', {
+              body: {
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+              }
+            });
 
-      if (error) throw error;
+            if (verifyError) throw verifyError;
 
-      toast.success('PAYLOAD SENT: Admin will verify and activate your node shortly.');
-      setSelectedPlan(null);
-      setUtr('');
-      setProofImage(null);
+            if (verifyData.success) {
+              toast.success('NODE ACTIVATED: Subscription protocol online!');
+              navigate('/shop/dashboard');
+            }
+          } catch (err) {
+            console.error('Verification error:', err);
+            toast.error('VERIFICATION FAILURE: Contact support');
+          }
+        },
+        prefill: {
+          name: user.email?.split('@')[0] || '',
+          email: user.email || '',
+        },
+        theme: {
+          color: RAZORPAY_CONFIG.themeColor
+        },
+        modal: {
+          ondismiss: () => setIsSubmitting(false)
+        }
+      };
+
+      await initializeRazorpayPayment(options);
     } catch (err: any) {
-      console.error('Payment submission full error:', err);
-      toast.error(err.message || 'TRANSMISSION FAILURE: Uplink rejected');
-    } finally {
+      console.error('Payment flow error:', err);
+      toast.error(err.message || 'TRANSMISSION FAILURE: Payment uplink rejected');
       setIsSubmitting(false);
     }
   };
@@ -343,7 +357,7 @@ export default function Plans() {
                animate={{ opacity: 1 }}
                exit={{ opacity: 0 }}
                className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-2xl"
-               onClick={() => setSelectedPlan(null)}
+               onClick={() => !isSubmitting && setSelectedPlan(null)}
             >
                <motion.div 
                   initial={{ scale: 0.9, opacity: 0, y: 30 }}
@@ -355,123 +369,70 @@ export default function Plans() {
                   {/* Decorative Elements */}
                   <div className="absolute top-0 right-0 w-64 h-64 bg-brand-primary/10 blur-[100px] rounded-full -z-10" />
 
-                  <div className="p-10 border-b border-white/5 relative">
-                     <button onClick={() => setSelectedPlan(null)} className="absolute top-8 right-8 w-10 h-10 flex items-center justify-center text-slate-500 hover:text-white bg-white/5 rounded-full transition-all hover:rotate-90">
-                        <X size={20} />
-                     </button>
-                     <div className="w-20 h-20 bg-brand-primary/10 rounded-[2rem] flex items-center justify-center mb-6 border border-brand-primary/20 shadow-glow-green/5">
+                  <div className="p-10 border-b border-white/5 relative text-center">
+                     {!isSubmitting && (
+                       <button onClick={() => setSelectedPlan(null)} className="absolute top-8 right-8 w-10 h-10 flex items-center justify-center text-slate-500 hover:text-white bg-white/5 rounded-full transition-all hover:rotate-90">
+                          <X size={20} />
+                       </button>
+                     )}
+                     <div className="w-20 h-20 mx-auto bg-brand-primary/10 rounded-[2.5rem] flex items-center justify-center mb-6 border border-brand-primary/20 shadow-glow-green/5">
                         <CreditCard className="text-brand-primary" size={32} />
                      </div>
                      <h2 className="text-3xl font-black text-white italic uppercase tracking-tighter leading-none mb-2">Protocol <span className="text-brand-primary">Settlement</span></h2>
-                     <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.4em] italic">Uplink Activation: {selectedPlan.name}</p>
+                     <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.4em] italic">Activation: {selectedPlan.name}</p>
                   </div>
 
                   <div className="p-10 space-y-10">
                      <div className="p-1.5 bg-slate-950/50 backdrop-blur-xl border border-white/5 rounded-2xl shadow-inner flex">
                         <button 
+                           disabled={isSubmitting}
                            onClick={() => setPaymentType('monthly')}
-                           className={`flex-1 py-4 px-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all truncate italic ${paymentType === 'monthly' ? 'bg-brand-primary text-white shadow-glow-green' : 'text-slate-500 hover:text-slate-300'}`}
+                           className={`flex-1 py-4 px-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all truncate italic disabled:opacity-50 ${paymentType === 'monthly' ? 'bg-brand-primary text-white shadow-glow-green' : 'text-slate-500 hover:text-slate-300'}`}
                         >
                            Monthly (₹{selectedPlan.monthly_price})
                         </button>
                         <button 
+                           disabled={isSubmitting}
                            onClick={() => setPaymentType('yearly')}
-                           className={`flex-1 py-4 px-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all truncate italic ${paymentType === 'yearly' ? 'bg-brand-primary text-white shadow-glow-green' : 'text-slate-500 hover:text-slate-300'}`}
+                           className={`flex-1 py-4 px-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all truncate italic disabled:opacity-50 ${paymentType === 'yearly' ? 'bg-brand-primary text-white shadow-glow-green' : 'text-slate-500 hover:text-slate-300'}`}
                         >
                            Yearly (₹{selectedPlan.yearly_price})
                         </button>
                      </div>
 
-                     <div className="bg-brand-primary/5 p-8 rounded-[2.5rem] border border-brand-primary/10 relative group overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-                           <Radio size={120} />
+                     <div className="bg-brand-primary/5 p-8 rounded-[3rem] border border-brand-primary/10 relative group overflow-hidden text-center">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-4 italic">Settlement Summary</p>
+                        <div className="flex items-center justify-center gap-2 mb-4">
+                           <IndianRupee size={24} className="text-brand-primary" strokeWidth={3} />
+                           <span className="text-5xl font-black text-white italic tracking-tighter">
+                              {paymentType === 'monthly' ? selectedPlan.monthly_price : selectedPlan.yearly_price}
+                           </span>
                         </div>
-                        <div className="flex items-center gap-4 mb-6 relative z-10">
-                           <div className="w-10 h-10 rounded-xl bg-brand-primary text-slate-950 flex items-center justify-center shadow-glow-green group-hover:scale-110 transition-transform">
-                              <IndianRupee size={20} strokeWidth={3} />
-                           </div>
-                           <h3 className="text-sm font-black text-white uppercase tracking-widest italic">Phase 1: Relay Hub Transfer</h3>
-                        </div>
-                        <div className="flex items-center justify-between gap-4 p-5 bg-slate-950 rounded-2xl border border-white/5 shadow-inner group">
-                           <span className="text-xs font-black text-brand-primary font-mono tracking-widest truncate">sachinkumar647422.payments@oksbi</span>
-                           <Button 
-                             onClick={() => { navigator.clipboard.writeText('sachinkumar647422.payments@oksbi'); toast.success('RELAY ID COPIED'); }} 
-                             variant="ghost"
-                             className="!p-0 h-10 w-10 !rounded-xl text-brand-primary hover:bg-brand-primary/10"
-                           >
-                              <Copy size={18} />
-                           </Button>
-                        </div>
-                        <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mt-4 leading-relaxed italic pr-12">Authorized for GooglePay, PhonePe, Paytm, and all regional UPI clusters.</p>
+                        <p className="text-[9px] text-brand-primary/60 font-black uppercase tracking-widest italic">Gateway Security: Standard Tier</p>
                      </div>
 
-                     <div className="space-y-6">
-                        <div className="flex items-center gap-4">
-                           <div className="w-10 h-10 rounded-xl bg-brand-secondary text-white flex items-center justify-center shadow-glow-secondary">
-                              <ShieldCheck size={20} strokeWidth={3} />
-                           </div>
-                           <h3 className="text-sm font-black text-white uppercase tracking-widest italic">Phase 2: Payload Verification</h3>
-                        </div>
-                        <div className="space-y-4">
-                           <Input 
-                               placeholder="12-DIGIT PROTOCOL UTR" 
-                               value={utr}
-                               onChange={(e) => setUtr(e.target.value)}
-                               className="h-16 bg-white/5 border-white/10 focus:border-brand-primary font-mono text-center tracking-[0.4em] font-black text-lg transition-all"
-                           />
-                           <div className="flex items-center gap-3 px-2">
-                              <Zap size={14} className="text-brand-secondary" />
-                              <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest italic">Verify your transmission using the reference ID from your banking interface.</p>
-                           </div>
+                     <div className="space-y-4">
+                        <Button 
+                           onClick={handleRazorpayPayment}
+                           disabled={isSubmitting}
+                           variant="primary"
+                           className="w-full h-24 !rounded-[2.5rem] shadow-glow-green text-sm font-black uppercase italic tracking-[0.4em] relative group overflow-hidden"
+                        >
+                           {isSubmitting ? (
+                             <span className="flex items-center gap-3">
+                               <Cpu className="animate-spin" size={20} /> Initializing Relay...
+                             </span>
+                           ) : (
+                             <span className="flex items-center gap-3">
+                               Secure Checkout <ArrowRight size={20} className="group-hover:translate-x-2 transition-transform" />
+                             </span>
+                           )}
+                        </Button>
+                        <div className="flex items-center justify-center gap-3 opacity-30">
+                           <Shield size={12} className="text-brand-primary" />
+                           <span className="text-[8px] font-black uppercase tracking-widest">PCI-DSS Compliant Infrastructure</span>
                         </div>
                      </div>
-
-                     <div className="space-y-6">
-                        <div className="flex items-center gap-4">
-                           <div className="w-10 h-10 rounded-xl bg-indigo-500 text-white flex items-center justify-center shadow-glow-indigo">
-                              <Camera size={20} strokeWidth={3} />
-                           </div>
-                           <h3 className="text-sm font-black text-white uppercase tracking-widest italic">Phase 3: Visual Proof</h3>
-                        </div>
-                        
-                        <div className="relative group/upload">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const reader = new FileReader();
-                                reader.onloadend = () => setProofImage(reader.result as string);
-                                reader.readAsDataURL(file);
-                              }
-                            }}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                          />
-                          <div className={`w-full h-32 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center gap-2 transition-all ${proofImage ? 'border-brand-primary bg-brand-primary/5' : 'border-white/10 bg-white/5 hover:border-brand-primary/30'}`}>
-                            {proofImage ? (
-                              <>
-                                <img src={proofImage} className="w-16 h-16 object-cover rounded-lg border border-brand-primary/20" alt="Proof" />
-                                <span className="text-[8px] font-black text-brand-primary uppercase tracking-widest italic">Screenshot Attached ✓</span>
-                              </>
-                            ) : (
-                              <>
-                                <ImageIcon size={24} className="text-slate-600 group-hover/upload:text-brand-primary transition-colors" />
-                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest italic">Upload Payment Screenshot</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                     <Button 
-                        onClick={handlePurchase}
-                        disabled={isSubmitting}
-                        variant="primary"
-                        className="w-full h-20 !rounded-[2rem] shadow-glow-green text-sm font-black uppercase italic tracking-[0.4em]"
-                     >
-                        {isSubmitting ? 'Verifying Link...' : 'Confirm Transmission ✓'}
-                     </Button>
                   </div>
                </motion.div>
             </motion.div>
